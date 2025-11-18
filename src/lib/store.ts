@@ -2,6 +2,7 @@ import { configureStore } from '@reduxjs/toolkit';
 import habitsReducer from "./features/habitsAndNotes/habitsSlice";
 import notesReducer from "./features/habitsAndNotes/notesSlice";
 import snapshotsReducer from "./features/habitsAndNotes/snapshotsSlice";
+import googleSheetsReducer from "./features/googleSheets/googleSheetsSlice";
 import { localStorageMiddleware } from "./middleware/localStorageMiddleware"
 
 export const makeStore = () => {
@@ -9,7 +10,8 @@ export const makeStore = () => {
     reducer: {
         habits: habitsReducer,
         notes: notesReducer,
-        snapshots: snapshotsReducer
+        snapshots: snapshotsReducer,
+        googleSheets: googleSheetsReducer 
     },
     middleware: getDefaultMiddleware =>
       getDefaultMiddleware().prepend(localStorageMiddleware),

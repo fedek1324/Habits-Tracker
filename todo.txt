@@ -36,6 +36,7 @@ something in habits some old data from local state pushes to google
 seen when i delete column in google but there was habit in local storage
 
 set current date in useEffect and then filter habits for today habits render
+handle case when Habits column or Notes column is deleted
 
 PLAN HABITS and notes: I any column is filled already, consider it
 

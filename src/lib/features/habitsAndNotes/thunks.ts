@@ -1,25 +1,25 @@
 import { createAsyncThunk } from "@reduxjs/toolkit";
-import type { RootState } from "./store";
+import type { RootState } from "../../store";
 
 // Imports from slices
 import {
   setHabits,
   addHabit,
-} from "./features/habitsAndNotes/habitsSlice";
+} from "./habitsSlice";
 import {
   setNotes,
   addNote,
-} from "./features/habitsAndNotes/notesSlice";
+} from "./notesSlice";
 import {
   setSnapshots,
   setTodayAndFillHistory,
   addHabitToSnapshot,
   addNoteToSnapshot,
   selectToday,
-} from "./features/habitsAndNotes/snapshotsSlice";
-import IHabbit from "../app/types/habbit";
-import INote from "../app/types/note";
-import IDailySnapshot from "../app/types/dailySnapshot";
+} from "./snapshotsSlice";
+import IHabbit from "../../../app/types/habbit";
+import INote from "../../../app/types/note";
+import IDailySnapshot from "../../../app/types/dailySnapshot";
 
 // ========================================
 // INITIALIZATION THUNKS
