@@ -199,15 +199,15 @@ export const fillHistory = (today: Date): void => {
 
   // today with time 00.00.00 for correct currentDate < today compare
   const today00 = getDate00(today);
-  let previousSnapshot;
+  let lastSnapshot;
   const snapshots = getDailySnapshotsRaw();
 
   if (snapshots.length > 1) {
-    previousSnapshot = snapshots.sort((a, b) =>
+    lastSnapshot = snapshots.sort((a, b) =>
       b.date.localeCompare(a.date)
-    )[1];
+    )[0];
 
-    const currentDate = getDate00(previousSnapshot.date);
+    const currentDate = getDate00(lastSnapshot.date);
     // increase current date by 1 to compare with today. 
     // If it makes day like 32 it is transformed to new month automatically
     currentDate.setDate(currentDate.getDate() + 1);
@@ -216,14 +216,14 @@ export const fillHistory = (today: Date): void => {
       const date = getDateString(currentDate);
       const snapshot = {
         date: date,
-        habbits: previousSnapshot.habbits.map((h) => {
+        habbits: lastSnapshot.habbits.map((h) => {
           return {
             habbitId: h.habbitId,
             habbitNeedCount: h.habbitNeedCount,
             habbitDidCount: 0,
           };
         }),
-        notes: previousSnapshot.notes?.map((n) => ({
+        notes: lastSnapshot.notes?.map((n) => ({
           noteId: n.noteId,
           noteText: ""
         })) || []
