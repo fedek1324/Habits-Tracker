@@ -1,6 +1,7 @@
 import IDailySnapshot from "@/src/app/types/dailySnapshot";
 import { createSlice, PayloadAction } from "@reduxjs/toolkit";
 import { RootState } from "../../store";
+import { getDateString } from "@/src/app/helpers/getDateString";
 
 interface SnapshotsState {
   items: IDailySnapshot[];
@@ -78,15 +79,11 @@ const snapshotsSlice = createSlice({
       lastDate.setHours(0, 0, 0, 0);
       todayDate.setHours(0, 0, 0, 0);
 
-      if (lastDate >= todayDate) {
-        return;
-      }
-
       const currentDate = new Date(lastDate);
       currentDate.setDate(currentDate.getDate() + 1);
 
-      while (currentDate < todayDate) {
-        const dateStr = currentDate.toISOString().split("T")[0];
+      while (currentDate <= todayDate) {
+        const dateStr = getDateString(currentDate);
 
         const exists = state.items.some((s) => s.date === dateStr);
 

@@ -92,7 +92,7 @@ export default function Home() {
     // synchronize habits data with local storage or google
     if (today) {
       if (loadedData) {
-        console.log("Home: effect called Getting data from loaded data");
+        console.log("Home: effect called Getting data from loaded data", loadedData, today);
         // also fills history empty day snapshots
         dispatch(initializeStore({ ...loadedData, today }));
       } else {
