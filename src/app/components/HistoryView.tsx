@@ -4,6 +4,7 @@ import IHabbit from "@/src/app/types/habbit";
 import INote from "@/src/app/types/note";
 import { IoCheckmarkCircle } from "react-icons/io5";
 import IDailySnapshot from "@/src/app/types/dailySnapshot";
+import { getDate00 } from "../helpers/date";
 
 interface HistoryViewProps {
   habits: IHabbit[];
@@ -42,8 +43,8 @@ const HistoryView: React.FC<HistoryViewProps> = ({
     ? snapshots
         .filter((snapshot) => {
           // today with time 00.00.00 for correct currentDate < today compare
-          const today00 = new Date(today.toISOString().split("T")[0]);
-          const snapshotDate = new Date(snapshot.date);
+          const today00 = getDate00(today);
+          const snapshotDate = getDate00(snapshot.date);
           return snapshotDate <= today00;
         })
         .map((snapshot) => ({
@@ -75,7 +76,7 @@ const HistoryView: React.FC<HistoryViewProps> = ({
     if (dayIndex === 0) return "Today";
     if (dayIndex === 1) return "Yesterday";
 
-    const date = new Date(dateString);
+    const date = getDate00(dateString);
     return date.toLocaleDateString("en-US", {
       month: "short",
       day: "numeric",

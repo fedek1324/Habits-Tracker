@@ -3,6 +3,7 @@
 import IHabbit from "../types/habbit";
 import IDailySnapshot from "../types/dailySnapshot";
 import INote from "../types/note";
+import { getDate00, getDateString } from "../helpers/date";
 
 // Storage keys for localStorage
 const HABITS_STORAGE_KEY = "habits";
@@ -118,7 +119,7 @@ export const saveDailySnapshot = (
       for (let i = 0; i < existingSnapshots.length; i++) {
         const element = existingSnapshots[i];
         const isSameDay = element.date === snapshot.date;
-        const isAfterSnapshot = new Date(element.date) > new Date(snapshot.date);
+        const isAfterSnapshot = getDate00(element.date) > getDate00(snapshot.date);
         const isLastElement = i === existingSnapshots.length - 1;
         
         if (isSameDay) {
@@ -150,7 +151,7 @@ export const saveDailySnapshot = (
  */
 export const getTodaySnapshot = (today: Date): IDailySnapshot => {
   const snapshots = getDailySnapshotsRaw();
-  const todayDay = today.toISOString().split("T")[0];
+  const todayDay = getDateString(today);
   let todaySnapshot = snapshots.find((s) => s.date === todayDay);
 
   if (!todaySnapshot) {
@@ -197,7 +198,7 @@ export const fillHistory = (today: Date): void => {
   getTodaySnapshot(today);
 
   // today with time 00.00.00 for correct currentDate < today compare
-  const today00 = new Date(today.toISOString().split("T")[0]);
+  const today00 = getDate00(today);
   let previousSnapshot;
   const snapshots = getDailySnapshotsRaw();
 
@@ -206,13 +207,13 @@ export const fillHistory = (today: Date): void => {
       b.date.localeCompare(a.date)
     )[1];
 
-    const currentDate = new Date(previousSnapshot.date);
+    const currentDate = getDate00(previousSnapshot.date);
     // increase current date by 1 to compare with today. 
     // If it makes day like 32 it is transformed to new month automatically
     currentDate.setDate(currentDate.getDate() + 1);
 
-    while (currentDate < today00) {
-      const date = currentDate.toISOString().split("T")[0];
+    while (currentDate <= today00) {
+      const date = getDateString(currentDate);
       const snapshot = {
         date: date,
         habbits: previousSnapshot.habbits.map((h) => {

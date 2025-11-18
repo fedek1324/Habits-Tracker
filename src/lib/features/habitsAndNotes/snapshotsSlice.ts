@@ -1,7 +1,7 @@
 import IDailySnapshot from "@/src/app/types/dailySnapshot";
 import { createSlice, PayloadAction } from "@reduxjs/toolkit";
 import { RootState } from "../../store";
-import { getDateString } from "@/src/app/helpers/getDateString";
+import { getDate00, getDateString } from "@/src/app/helpers/date";
 
 interface SnapshotsState {
   items: IDailySnapshot[];
@@ -11,7 +11,7 @@ interface SnapshotsState {
 const initialState: SnapshotsState = {
   items: [],
   // TODO: Add autoupdate using thunk
-  today: new Date().toISOString().split("T")[0],
+  today: getDateString(Date.now()),
 };
 
 const snapshotsSlice = createSlice({
@@ -73,13 +73,10 @@ const snapshotsSlice = createSlice({
       );
       const lastSnapshot = sortedSnapshots[sortedSnapshots.length - 1];
 
-      const lastDate = new Date(lastSnapshot.date);
-      const todayDate = new Date(today);
+      const lastDate = getDate00(lastSnapshot.date);
+      const todayDate = getDate00(today);
 
-      lastDate.setHours(0, 0, 0, 0);
-      todayDate.setHours(0, 0, 0, 0);
-
-      const currentDate = new Date(lastDate);
+      const currentDate = getDate00(lastDate);
       currentDate.setDate(currentDate.getDate() + 1);
 
       while (currentDate <= todayDate) {
@@ -400,13 +397,13 @@ export const selectLastNDaysSnapshots = (
   days: number = 30
 ): IDailySnapshot[] => {
   if (state.snapshots.today) {
-    const todayDate = new Date(state.snapshots.today);
-    const nDaysAgo = new Date(todayDate);
+    const todayDate = getDate00(state.snapshots.today);
+    const nDaysAgo = getDate00(todayDate);
     nDaysAgo.setDate(nDaysAgo.getDate() - days + 1);
 
     return state.snapshots.items
       .filter((snapshot) => {
-        const snapshotDate = new Date(snapshot.date);
+        const snapshotDate = getDate00(snapshot.date);
         return snapshotDate >= nDaysAgo && snapshotDate <= todayDate;
       })
       .sort((a, b) => a.date.localeCompare(b.date));

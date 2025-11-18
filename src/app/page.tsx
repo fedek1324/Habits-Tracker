@@ -40,6 +40,7 @@ import {
   getHabits,
   getNotes,
 } from "./services/apiLocalStorage";
+import { getDate00 } from "./helpers/date";
 
 type DispalyHabbit = {
   habitId: string;
@@ -74,7 +75,7 @@ export default function Home() {
       : ""
   );
 
-  const todayDate = useMemo(() => new Date(today), [today]);
+  const todayDate = useMemo(() => getDate00(today), [today]);
 
   const {
     googleState,

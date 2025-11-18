@@ -20,6 +20,7 @@ import {
 import IHabbit from "../../../app/types/habbit";
 import INote from "../../../app/types/note";
 import IDailySnapshot from "../../../app/types/dailySnapshot";
+import { getDate00, getDateString } from "@/src/app/helpers/date";
 
 // ========================================
 // INITIALIZATION THUNKS
@@ -60,13 +61,12 @@ export const initializeStore = createAsyncThunk(
 export const setupTodaySync = createAsyncThunk(
   "snapshots/setupSync",
   async (_, { dispatch, getState }) => {
-    const getTodayString = () => new Date().toISOString().split("T")[0];
 
     const checkAndUpdate = () => {
       console.log("Checking day update");
       const state = getState() as RootState;
       const todayInState = selectToday(state);
-      const currentToday = getTodayString();
+      const currentToday = getDateString(Date.now());
 
       if (todayInState !== currentToday) {
         dispatch(setTodayAndFillHistory(currentToday));
