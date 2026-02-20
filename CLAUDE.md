@@ -20,10 +20,13 @@ Next.js 15 habit tracker app with:
 
 ## Architecture Principles
 
+- Write clean, well-architected code — always think about structure before implementing
+- After adding a new feature, refactor: simplify logic, reduce complexity, improve code structure
 - Minimize API/network calls (batch where possible, debounce uploads)
 - Prefer refactoring over duplication
 - Keep components small and focused
 - Write clean, typed TypeScript — no `any`
+- Add comments only for genuinely complex or non-obvious logic — do not comment self-explanatory code
 
 ## Tech Stack
 
