@@ -78,6 +78,13 @@ export default function Home() {
   // SWR-based 30s polling — dispatches to Redux on each successful fetch
   const { triggerSync } = useHabitsSync();
 
+  // Restore refresh token from localStorage into Redux on mount.
+  // Required because Redux starts empty on every page load.
+  useEffect(() => {
+    const stored = localStorage.getItem("googleRefreshToken");
+    if (stored) dispatch(setRefreshToken(stored));
+  }, [dispatch]);
+
   // Load from localStorage when not connected to Google
   useEffect(() => {
     if (!today || refreshToken) return;
