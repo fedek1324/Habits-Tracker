@@ -44,9 +44,12 @@ Next.js 15 habit tracker app with:
 ```text
 src/
 ├── app/
-│   ├── api/auth/google/
-│   │   ├── route.ts              # Google OAuth handler
-│   │   └── refresh-token/route.ts # Token refresh endpoint
+│   ├── api/
+│   │   ├── auth/google/
+│   │   │   ├── route.ts              # Google OAuth handler (code → tokens)
+│   │   │   └── refresh-token/route.ts # Token refresh endpoint
+│   │   └── habits/
+│   │       └── route.ts              # GET /api/habits — reads from Google Sheets (server-side)
 │   ├── components/
 │   │   ├── HabbitButton.tsx      # Single habit UI (increment / edit / delete)
 │   │   ├── AddHabbit.tsx         # Add habit form
@@ -59,7 +62,7 @@ src/
 │   ├── helpers/
 │   │   └── date.ts               # getDateString(), getDate00()
 │   ├── hooks/
-│   │   └── useGoogleSheets.ts    # All Google Sheets logic
+│   │   └── useHabitsSync.ts      # SWR hook — polls /api/habits every 30s, updates Redux
 │   ├── services/
 │   │   └── apiLocalStorage.ts    # localStorage CRUD layer
 │   ├── types/
@@ -72,6 +75,8 @@ src/
 │   ├── layout.tsx
 │   └── StoreProvider.tsx
 └── lib/
+    ├── googleSheets/
+    │   └── googleSheetsApi.ts    # Shared Google API utilities (no "use client")
     ├── features/
     │   ├── habitsAndNotes/
     │   │   ├── habitsSlice.ts
@@ -80,7 +85,7 @@ src/
     │   │   └── thunks.ts
     │   └── googleSheets/
     │       ├── googleSheetsSlice.ts
-    │       └── thunks.ts
+    │       └── thunks.ts         # onLogin, uploadDataToGoogle, onLogout
     ├── middleware/
     │   └── localStorageMiddleware.ts  # Persists Redux state to localStorage
     ├── hooks.ts                       # Typed useAppSelector / useAppDispatch
@@ -130,10 +135,12 @@ interface IDailySnapshot {
 
 **Flow:**
 
-1. User authenticates → refresh token stored in `localStorage`
-2. On load: find or create `"My habits tracker"` spreadsheet via Drive API v3
-3. Read existing data or populate from local state
-4. On every state change: debounced (500ms) `batchUpdate` upload to Sheets API v4
+1. User authenticates → tokens dispatched to Redux, refresh token saved to `localStorage`
+2. `useHabitsSync` SWR hook detects `refreshToken` in Redux → starts polling `GET /api/habits`
+3. `GET /api/habits` (server-side): refreshes access token via `UserRefreshClient`, reads spreadsheet
+4. If no spreadsheet: `uploadDataToGoogle` thunk creates it from local Redux state
+5. On every data change: `uploadDataToGoogle` thunk writes to Sheets via `batchUpdate`
+6. SWR revalidates every 30s and on window focus
 
 **Spreadsheet format:**
 
@@ -142,15 +149,14 @@ interface IDailySnapshot {
 - Row 2+: daily rows — date in col 0, habit values as `"actual/needed"`, note texts
 
 **Google State machine** (`src/app/types/googleState.ts`):
-`NOT_CONNECTED` → `HAS_REFRESH_TOKEN` → `CONNECTED` / `ERROR`
-During sync: `UPDATING`
+`NOT_CONNECTED` → `UPDATING` → `CONNECTED` / `ERROR`
 
-**Key functions in `useGoogleSheets.ts`:**
+**Key modules:**
 
-- `makeAuthenticatedRequest()` — auto-refreshes access token when expired
-- `getDataCheckEmpty()` — load from Sheets or create spreadsheet on first login
-- `uploadDataToGoogle()` — debounced full sync to Sheets
-- `populateSpreadsheetWithHabits()` — atomic `batchUpdate` write
+- `src/lib/googleSheets/googleSheetsApi.ts` — shared utilities: `findSpreadsheetByName`, `readSpreadsheetData`, `parseSpreadsheetRows`, `writeSpreadsheetData`, `createSpreadsheet`
+- `src/app/api/habits/route.ts` — server-side `GET /api/habits`, handles token refresh via `UserRefreshClient`
+- `src/app/hooks/useHabitsSync.ts` — SWR polling hook (`refreshInterval: 30_000`)
+- `src/lib/features/googleSheets/thunks.ts` — `onLogin`, `uploadDataToGoogle`, `onLogout`
 
 ## Component Patterns
 

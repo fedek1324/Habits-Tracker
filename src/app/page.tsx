@@ -22,18 +22,22 @@ import {
   deleteNoteFromSnapshot,
   incrementHabitDidCount,
 } from "@/src/lib/features/habitsAndNotes/snapshotsSlice";
-import {
-  selectAllHabits,
-  updateHabit,
-} from "@/src/lib/features/habitsAndNotes/habitsSlice";
+import { selectAllHabits, updateHabit } from "@/src/lib/features/habitsAndNotes/habitsSlice";
 import { selectAllNotes, updateNote } from "@/src/lib/features/habitsAndNotes/notesSlice";
 import { addHabitWithSnapshot, addNoteWithSnapshot, initializeStore } from "@/src/lib/features/habitsAndNotes/thunks";
+import {
+  selectGoogleStatus,
+  selectRefreshToken,
+  selectSpreadsheetUrl,
+  setRefreshToken,
+  setAccessToken,
+} from "@/src/lib/features/googleSheets/googleSheetsSlice";
+import { uploadDataToGoogle } from "@/src/lib/features/googleSheets/thunks";
+import { useHabitsSync } from "@/src/app/hooks/useHabitsSync";
 
 import IHabbit from "@/src/app/types/habbit";
 import INote from "@/src/app/types/note";
-
 import { GoogleState } from "@/src/app/types/googleState";
-import { useGoogleSheets } from "@/src/app/hooks/useGoogleSheets";
 
 import {
   getDailySnapshotsRaw,
@@ -42,116 +46,87 @@ import {
 } from "./services/apiLocalStorage";
 import { getDate00 } from "./helpers/date";
 
-type DispalyHabbit = {
+type DisplayHabit = {
   habitId: string;
   text: string;
   needCount: number;
   actualCount: number;
 };
 
-type DispalyNote = {
+type DisplayNote = {
   noteId: string;
   noteName: string;
   noteText: string;
 };
 
-let homeRenderCount = 0;
-
 export default function Home() {
   const dispatch = useAppDispatch();
+
   const habits = useAppSelector(selectAllHabits);
   const notes = useAppSelector(selectAllNotes);
-  const snapshots = useAppSelector(selectAllSnapshots)
+  const snapshots = useAppSelector(selectAllSnapshots);
   const today = useAppSelector(selectToday);
   const todaySnapshot = useAppSelector(selectTodaySnapshot);
-
+  const googleState = useAppSelector(selectGoogleStatus);
+  const refreshToken = useAppSelector(selectRefreshToken);
+  const spreadsheetUrl = useAppSelector(selectSpreadsheetUrl);
 
   const [activeTab, setActiveTab] = useState<"today" | "history">("today");
-  // const [error, setError] = useState<string>("");
 
-  const [refreshToken, setRefreshTokenPrivate] = useState<string>(
-    typeof window !== "undefined"
-      ? localStorage.getItem("googleRefreshToken") || ""
-      : ""
+  const todayDate = useMemo(() => (today ? getDate00(today) : undefined), [today]);
+
+  // SWR-based 30s polling — dispatches to Redux on each successful fetch
+  const { triggerSync } = useHabitsSync();
+
+  // Load from localStorage when not connected to Google
+  useEffect(() => {
+    if (!today || refreshToken) return;
+    dispatch(
+      initializeStore({
+        habits: getHabits(),
+        notes: getNotes(),
+        snapshots: getDailySnapshotsRaw(),
+        today,
+      })
+    );
+  }, [today, refreshToken, dispatch]);
+
+  // ── Auth handlers ────────────────────────────────────────
+
+  const handleSetRefreshToken = useCallback(
+    (token: string) => {
+      localStorage.setItem("googleRefreshToken", token || "");
+      dispatch(setRefreshToken(token || null));
+    },
+    [dispatch]
   );
 
-  const todayDate = useMemo(() => getDate00(today), [today]);
-
-  const {
-    googleState,
-    getGoogleData,
-    uploadDataToGoogle,
-    spreadsheetUrl,
-    setGoolgeAccessToken,
-    loadedData,
-  } = useGoogleSheets(todayDate, refreshToken);
-
-  // const prevGoogleStateRef = useRef<GoogleState>(GoogleState.NOT_CONNECTED);
-
-  // TODO maybe create some async thunk that will init data on client to bypass hydration (local storage issue)
-  useEffect(() => {
-    // synchronize habits data with local storage or google
-    if (today) {
-      if (loadedData) {
-        console.log("Home: effect called Getting data from loaded data", loadedData, today);
-        // also fills history empty day snapshots
-        dispatch(initializeStore({ ...loadedData, today }));
-      } else {
-        console.log("Home: effect called Getting data from local storage");
-        // get from local storage
-        const habitsLocalStorage = getHabits();
-        const notesLocalStorage = getNotes();
-        const snapshotsLocalStorage = getDailySnapshotsRaw();
-
-        // fill history in local storage
-        dispatch(
-          initializeStore({
-            habits: habitsLocalStorage,
-            notes: notesLocalStorage,
-            snapshots: snapshotsLocalStorage,
-            today,
-          })
-        );
-      }
-    } else {
-      console.log("Home: effect called No today in Home effect");
-    }
-  }, [today, loadedData, dispatch]);
-  
-  const setRefreshToken = (refreshToken: string) => {
-    localStorage.setItem("googleRefreshToken", refreshToken || "");
-    setRefreshTokenPrivate(refreshToken || "");
-  };
-
-  homeRenderCount++;
-  console.log("Home: render. Total: " + homeRenderCount);
+  const handleSetAccessToken = useCallback(
+    (token: string) => {
+      dispatch(setAccessToken(token || null));
+    },
+    [dispatch]
+  );
 
   const handleSyncNowButtonClick = useCallback(() => {
-    if (!todayDate) {
-      return;
-    }
-    getGoogleData(todayDate);
-  }, [getGoogleData, todayDate]);
+    triggerSync();
+  }, [triggerSync]);
 
-  const handleAddHabit = async (newHabbit: IHabbit, needCount: number) => {
-    dispatch(addHabitWithSnapshot({ habit: newHabbit, initialNeedCount: needCount }))
+  // ── Habit handlers ───────────────────────────────────────
 
-    await uploadDataToGoogle(todayDate, "handleAdd");
+  const handleAddHabit = async (newHabit: IHabbit, needCount: number) => {
+    dispatch(addHabitWithSnapshot({ habit: newHabit, initialNeedCount: needCount }));
+    dispatch(uploadDataToGoogle());
   };
 
   const handleIncrement = async (id: string) => {
     dispatch(incrementHabitDidCount(id));
-
-    await uploadDataToGoogle(todayDate, "handleAdd");
+    dispatch(uploadDataToGoogle());
   };
 
   const handleDelete = async (id: string) => {
-    // habit remains in habits storage to display it in history.
-    // removing from todays snapshot to not add habit on next day.
-    dispatch(deleteHabitFromSnapshot(id))
-
-    // Update google
-    await uploadDataToGoogle(todayDate, "handleAdd");
+    dispatch(deleteHabitFromSnapshot(id));
+    dispatch(uploadDataToGoogle());
   };
 
   const handleEdit = async (
@@ -159,76 +134,56 @@ export default function Home() {
     newNeedCount: number,
     newActualCount: number
   ) => {
-    // TODO create thunk maybe
     dispatch(updateHabit(habitChanged));
-    dispatch(updateHabitNeedCount({habitId: habitChanged.id, needCount: newNeedCount}));
-    dispatch(updateHabitDidCount({habitId: habitChanged.id, count: newActualCount}));
-
-    await uploadDataToGoogle(todayDate, "handleAdd");
+    dispatch(updateHabitNeedCount({ habitId: habitChanged.id, needCount: newNeedCount }));
+    dispatch(updateHabitDidCount({ habitId: habitChanged.id, count: newActualCount }));
+    dispatch(uploadDataToGoogle());
   };
 
+  // ── Note handlers ────────────────────────────────────────
+
   const handleAddNote = async (newNote: INote, text: string) => {
-    dispatch(addNoteWithSnapshot({note: newNote, initialText: text}));
-    await uploadDataToGoogle(todayDate, "handleAdd");
+    dispatch(addNoteWithSnapshot({ note: newNote, initialText: text }));
+    dispatch(uploadDataToGoogle());
   };
 
   const handleNoteEdit = async (noteChanged: INote, noteText: string) => {
-    // TODO create thunk maybe
     dispatch(updateNote(noteChanged));
-    dispatch(updateNoteText({noteId: noteChanged.id, text: noteText}));
-
-    // Update google
-    await uploadDataToGoogle(todayDate, "handleAdd");
+    dispatch(updateNoteText({ noteId: noteChanged.id, text: noteText }));
+    dispatch(uploadDataToGoogle());
   };
 
   const handleNoteDelete = async (id: string) => {
-    // habit remains in habits storage to display it in history.
-    // removing from todays snapshot to not add habit on next day.
     dispatch(deleteNoteFromSnapshot(id));
-
-    // Update google
-    await uploadDataToGoogle(todayDate, "handleAdd");
+    dispatch(uploadDataToGoogle());
   };
-  
-  const displayHabits: DispalyHabbit[] = useMemo(() => {
-    const res = [];
-    console.log(todaySnapshot);
-    if (todaySnapshot) {
-      console.log(todaySnapshot.habbits);
-      for (const habit of todaySnapshot.habbits) {
-        res.push({
-          habitId: habit.habbitId,
-          text:
-            habits.find((h) => h.id === habit.habbitId)?.text ||
-            "No text for today",
-          needCount: habit.habbitNeedCount,
-          actualCount: habit.habbitDidCount,
-        });
-      }
-    }
-    return res;
+
+  // ── Derived display data ─────────────────────────────────
+
+  const displayHabits: DisplayHabit[] = useMemo(() => {
+    if (!todaySnapshot) return [];
+    return todaySnapshot.habbits.map((habit) => ({
+      habitId: habit.habbitId,
+      text: habits.find((h) => h.id === habit.habbitId)?.text ?? "No text for today",
+      needCount: habit.habbitNeedCount,
+      actualCount: habit.habbitDidCount,
+    }));
   }, [todaySnapshot, habits]);
 
-  const displayNotes: DispalyNote[] = useMemo(() => {
-    const res = [];
-    if (todaySnapshot) {
-      for (const note of todaySnapshot.notes) {
-        res.push({
-          noteId: note.noteId,
-          noteName: notes.find((n) => n.id === note.noteId)?.name || "No text",
-          noteText: note.noteText,
-        });
-      }
-    }
-    return res;
+  const displayNotes: DisplayNote[] = useMemo(() => {
+    if (!todaySnapshot) return [];
+    return todaySnapshot.notes.map((note) => ({
+      noteId: note.noteId,
+      noteName: notes.find((n) => n.id === note.noteId)?.name ?? "No text",
+      noteText: note.noteText,
+    }));
   }, [todaySnapshot, notes]);
 
   const todayDisplayed = todayDate
-    ? todayDate.toLocaleDateString("en-US", {
-        day: "numeric",
-        month: "long",
-      })
+    ? todayDate.toLocaleDateString("en-US", { day: "numeric", month: "long" })
     : "loading...";
+
+  // ── Render ───────────────────────────────────────────────
 
   return (
     <div className="min-h-screen bg-gray-100">
@@ -242,64 +197,52 @@ export default function Home() {
                   : "Add habit or note using the button below"}
               </h1>
 
-              {/*Google integration panel */}
               <div className="mb-4">
                 <IntegrationPannel
                   state={googleState ?? GoogleState.NOT_CONNECTED}
-                  spreadSheetUrl={spreadsheetUrl}
+                  spreadSheetUrl={spreadsheetUrl ?? undefined}
                   onSyncNowClick={handleSyncNowButtonClick}
-                  onSetGoogleRefreshToken={setRefreshToken}
-                  onSetGoogleAccessToken={setGoolgeAccessToken}
+                  onSetGoogleRefreshToken={handleSetRefreshToken}
+                  onSetGoogleAccessToken={handleSetAccessToken}
                 />
               </div>
 
-              {/* Habbits and notes list */}
               {(displayHabits.length > 0 || displayNotes.length > 0) && (
                 <div className="mb-4 w-full space-y-4">
-                  {displayHabits.map((habit) => {
-                    return (
-                      <HabitButton
-                        key={habit.habitId}
-                        habbit={{
-                          id: habit.habitId,
-                          text: habit.text,
-                        }}
-                        currentCount={habit.actualCount}
-                        needCount={habit.needCount}
-                        onIncrement={handleIncrement}
-                        onEdit={handleEdit}
-                        onDelete={handleDelete}
-                      />
-                    );
-                  })}
-                  {displayNotes.map((note) => {
-                    return (
-                      <NoteButton
-                        key={note.noteId}
-                        note={{
-                          id: note.noteId,
-                          name: note.noteName,
-                        }}
-                        text={note.noteText}
-                        onEdit={handleNoteEdit}
-                        onDelete={handleNoteDelete}
-                      />
-                    );
-                  })}
+                  {displayHabits.map((habit) => (
+                    <HabitButton
+                      key={habit.habitId}
+                      habbit={{ id: habit.habitId, text: habit.text }}
+                      currentCount={habit.actualCount}
+                      needCount={habit.needCount}
+                      onIncrement={handleIncrement}
+                      onEdit={handleEdit}
+                      onDelete={handleDelete}
+                    />
+                  ))}
+                  {displayNotes.map((note) => (
+                    <NoteButton
+                      key={note.noteId}
+                      note={{ id: note.noteId, name: note.noteName }}
+                      text={note.noteText}
+                      onEdit={handleNoteEdit}
+                      onDelete={handleNoteDelete}
+                    />
+                  ))}
                 </div>
               )}
 
               <AddHabbit onAdd={handleAddHabit} />
               <AddNote onAdd={handleAddNote} />
             </>
-          ) : (
+          ) : todayDate ? (
             <HistoryView
               habits={habits}
               notes={notes}
               snapshots={snapshots}
               today={todayDate}
             />
-          )}
+          ) : null}
         </main>
 
         <BottomNavigation activeTab={activeTab} onTabChange={setActiveTab} />
