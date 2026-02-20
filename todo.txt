@@ -28,7 +28,7 @@ the right. And that new column will take that 1/3 which was after space.
 
 after one hour token expires and sync stops working
 
-USEGOOGLESHEETS still uses localStorage api
+!! USEGOOGLESHEETS still uses localStorage api
 
 direct google spreadsheet changes in runtime are not handled:
 when I change data in spreadsheet in runtime and then I change 
