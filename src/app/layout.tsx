@@ -62,8 +62,21 @@ export default function RootLayout({
         <StoreProvider>
           <GoogleOAuthProvider clientId={process.env.GOOGLE_CLIENT_ID || ""}>
             {children}
-          </GoogleOAuthProvider>;
+          </GoogleOAuthProvider>
         </StoreProvider>
+        <span style={{
+          position: "fixed",
+          top: "6px",
+          right: "8px",
+          fontSize: "10px",
+          color: "#9ca3af",
+          fontFamily: "monospace",
+          pointerEvents: "none",
+          userSelect: "none",
+          zIndex: 9999,
+        }}>
+          {process.env.NEXT_PUBLIC_COMMIT_HASH}
+        </span>
       </body>
     </html>
   );
