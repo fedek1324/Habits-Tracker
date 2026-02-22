@@ -2,6 +2,18 @@
 
 This file provides guidance to Claude Code when working with this repository.
 
+## Product
+
+A personal habit tracker for tracking daily habits — how many times per day a habit was done vs. the target. Works on any device (desktop, mobile, tablet) via the browser. Users connect their Google account once, and all data syncs automatically to a personal Google Spreadsheet so habits are accessible from any device at any time.
+
+Key features:
+
+- Add habits with a daily target count (e.g. "Read — 1×/day", "Push-ups — 3×/day")
+- Increment habit counter with one tap
+- Add daily notes
+- View history of past days
+- Cross-device sync via Google Sheets
+
 ## Workflow Rules
 
 - **Always push after every change** — commit and `git push` after completing any task.
