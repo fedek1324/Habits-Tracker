@@ -1,6 +1,7 @@
 "use client";
 
 import { useGoogleLogin } from "@react-oauth/google";
+import { useRouter } from "next/navigation";
 import axios from "axios";
 import { loginAction } from "@/src/app/actions";
 
@@ -8,6 +9,8 @@ const SCOPES =
   "https://www.googleapis.com/auth/spreadsheets https://www.googleapis.com/auth/drive.file";
 
 export default function LoginView() {
+  const router = useRouter();
+
   const login = useGoogleLogin({
     flow: "auth-code",
     scope: SCOPES,
@@ -18,6 +21,9 @@ export default function LoginView() {
       const { access_token, refresh_token } = data;
       if (access_token && refresh_token) {
         await loginAction(refresh_token, access_token);
+        // loginAction sets cookies server-side; router.refresh() causes
+        // Next.js to re-render the Server Component with the new cookies.
+        router.refresh();
       }
     },
     onError: (err) => console.error("Google login failed:", err),

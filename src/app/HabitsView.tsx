@@ -1,6 +1,7 @@
 "use client";
 
 import { useOptimistic, useTransition, useState, useMemo } from "react";
+import { useRouter } from "next/navigation";
 
 import HabitButton from "./components/HabbitButton";
 import AddHabbit from "./components/AddHabbit";
@@ -150,6 +151,7 @@ export default function HabitsView({
 }: Props) {
   const [activeTab, setActiveTab] = useState<"today" | "history">("today");
   const [, startTransition] = useTransition();
+  const router = useRouter();
 
   const [optimistic, addOptimistic] = useOptimistic<ViewState, OptimisticAction>(
     { habits, notes, todaySnapshot },
@@ -270,7 +272,7 @@ export default function HabitsView({
                   )}
                 </div>
                 <button
-                  onClick={() => startTransition(() => logoutAction())}
+                  onClick={() => startTransition(async () => { await logoutAction(); router.refresh(); })}
                   className="text-xs text-gray-500 hover:text-gray-700 transition-colors"
                 >
                   Disconnect
