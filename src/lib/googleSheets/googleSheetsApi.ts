@@ -20,6 +20,24 @@ export type SpreadsheetInfo = {
 type SheetRow = Array<{ userEnteredValue: { stringValue: string } }>;
 
 // ─────────────────────────────────────────────────────────
+// Stable ID generation
+// ─────────────────────────────────────────────────────────
+
+/**
+ * Derives a stable, deterministic ID from a column name.
+ * Must not use crypto.randomUUID() — IDs must be identical across
+ * every call to parseSpreadsheetRows so Server Actions can match them.
+ */
+function stableId(prefix: string, name: string): string {
+  let h = 0x811c9dc5;
+  for (let i = 0; i < name.length; i++) {
+    h ^= name.charCodeAt(i);
+    h = (h * 0x01000193) >>> 0; // FNV-1a 32-bit
+  }
+  return `${prefix}-${h.toString(16).padStart(8, "0")}-${name.length.toString(16).padStart(4, "0")}`;
+}
+
+// ─────────────────────────────────────────────────────────
 // Constants
 // ─────────────────────────────────────────────────────────
 
@@ -126,8 +144,10 @@ export function parseSpreadsheetRows(rows: string[][]): HabitsData {
     }
   }
 
-  const habits: IHabbit[] = habitNames.map((name) => ({ id: crypto.randomUUID(), text: name }));
-  const notes: INote[] = noteNames.map((name) => ({ id: crypto.randomUUID(), name }));
+  // IDs must be stable across parses so Server Actions can match them.
+  // We derive them deterministically from the column name (which is unique in Sheets).
+  const habits: IHabbit[] = habitNames.map((name) => ({ id: stableId("h", name), text: name }));
+  const notes: INote[] = noteNames.map((name) => ({ id: stableId("n", name), name }));
 
   const snapshots: IDailySnapshot[] = dataRows
     .filter((row) => row.length > 0 && row[0])
