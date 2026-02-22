@@ -8,7 +8,6 @@ import {
   readSpreadsheetData,
   parseSpreadsheetRows,
   writeSpreadsheetData,
-  createSpreadsheet,
   SPREADSHEET_NAME,
 } from "@/src/lib/googleSheets/googleSheetsApi";
 import { computeTodayAndFillHistory } from "@/src/lib/habits/stateHelpers";
@@ -49,10 +48,9 @@ type ServerContext = {
 async function getServerContext(): Promise<ServerContext> {
   const store = await cookies();
   const refreshToken = store.get("google_refresh_token")?.value;
-  const spreadsheetId = store.get("spreadsheet_id")?.value;
   const tz = store.get("tz")?.value ?? "UTC";
 
-  if (!refreshToken || !spreadsheetId) throw new Error("Not authenticated");
+  if (!refreshToken) throw new Error("Not authenticated");
 
   const client = new UserRefreshClient(
     process.env.GOOGLE_CLIENT_ID!,
@@ -62,9 +60,14 @@ async function getServerContext(): Promise<ServerContext> {
   const { credentials } = await client.refreshAccessToken();
   if (!credentials.access_token) throw new Error("Token refresh failed");
 
+  // Look up the spreadsheet by name every time — simple and reliable,
+  // avoids stale spreadsheet_id cookies causing silent failures.
+  const spreadsheet = await findSpreadsheetByName(credentials.access_token, SPREADSHEET_NAME);
+  if (!spreadsheet) throw new Error("Spreadsheet not found");
+
   const todayStr = new Intl.DateTimeFormat("en-CA", { timeZone: tz }).format(new Date());
 
-  return { accessToken: credentials.access_token, spreadsheetId, todayStr };
+  return { accessToken: credentials.access_token, spreadsheetId: spreadsheet.id, todayStr };
 }
 
 /** Read + parse current Sheets data, compute today's snapshot, return full mutable state. */
@@ -97,35 +100,17 @@ async function commitState(
 // Auth actions
 // ─────────────────────────────────────────────────────────
 
-export async function loginAction(
-  refreshToken: string,
-  accessToken: string
-): Promise<void> {
-  // Refresh to get a guaranteed-fresh token
-  const client = new UserRefreshClient(
-    process.env.GOOGLE_CLIENT_ID!,
-    process.env.GOOGLE_CLIENT_SECRET!,
-    refreshToken
-  );
-  const { credentials } = await client.refreshAccessToken();
-  const freshToken = credentials.access_token ?? accessToken;
-
-  // Find or create spreadsheet
-  let spreadsheet = await findSpreadsheetByName(freshToken, SPREADSHEET_NAME);
-  if (!spreadsheet) {
-    spreadsheet = await createSpreadsheet(freshToken, [], [], []);
-  }
-
+/**
+ * Called after Google OAuth. Only stores the refresh token — no Google API calls here.
+ * page.tsx handles finding/creating the spreadsheet on next render.
+ */
+export async function loginAction(refreshToken: string): Promise<void> {
   await setCookie("google_refresh_token", refreshToken);
-  await setCookie("spreadsheet_id", spreadsheet.id);
-  await setCookie("spreadsheet_url", spreadsheet.url);
-
   revalidatePath("/");
 }
 
 export async function logoutAction(): Promise<void> {
   await deleteCookie("google_refresh_token");
-  await deleteCookie("spreadsheet_id");
   revalidatePath("/");
 }
 

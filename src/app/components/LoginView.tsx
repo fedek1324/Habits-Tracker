@@ -18,11 +18,9 @@ export default function LoginView() {
       const { data } = await axios.post("/api/auth/google", {
         code: codeResponse.code,
       });
-      const { access_token, refresh_token } = data;
-      if (access_token && refresh_token) {
-        await loginAction(refresh_token, access_token);
-        // loginAction sets cookies server-side; router.refresh() causes
-        // Next.js to re-render the Server Component with the new cookies.
+      const { refresh_token } = data;
+      if (refresh_token) {
+        await loginAction(refresh_token);
         router.refresh();
       }
     },
