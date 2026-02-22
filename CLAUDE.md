@@ -2,6 +2,10 @@
 
 This file provides guidance to Claude Code when working with this repository.
 
+## Workflow Rules
+
+- **Always push after every change** — commit and `git push` after completing any task.
+
 ## Development Commands
 
 - `npm run dev` — dev server with Turbopack
@@ -12,17 +16,14 @@ This file provides guidance to Claude Code when working with this repository.
 
 ## Project Overview
 
-Next.js 15 habit tracker app with:
-
-- **Local-first storage** — all data in `localStorage` via Redux + middleware
-- **Google Sheets sync** — authenticated users sync their data to a personal Google Spreadsheet used as a backend
-- **No database** — Google Sheets is the only remote storage
+Next.js 15 habit tracker app. Google Sheets is the only storage — no database, no localStorage.
+Google auth is always required.
 
 ## Architecture Principles
 
 - Write clean, well-architected code — always think about structure before implementing
 - After adding a new feature, refactor: simplify logic, reduce complexity, improve code structure
-- Minimize API/network calls (batch where possible, debounce uploads)
+- Minimize API/network calls (batch where possible)
 - Prefer refactoring over duplication
 - Keep components small and focused
 - Write clean, typed TypeScript — no `any`
@@ -31,25 +32,46 @@ Next.js 15 habit tracker app with:
 ## Tech Stack
 
 - **Next.js 15** with App Router (`src/app/`)
-- **React 19**
+- **React 19** — `useOptimistic` + `useTransition` for instant UI feedback
 - **TypeScript** (strict mode)
-- **Redux Toolkit** — global state, no other state library
 - **Tailwind CSS** — styling + pastel color generation via HSL
 - **React Icons** — icons
-- **Axios** — HTTP requests to Google APIs
+- **Axios** — HTTP requests (OAuth code exchange)
 - **@react-oauth/google** — Google OAuth 2.0
+- **google-auth-library** — `UserRefreshClient` for server-side token refresh
+
+## Architecture: Server-first with useOptimistic
+
+**No Redux. No SWR. No localStorage.**
+
+```text
+Page load:
+  cookies (google_refresh_token + tz) → Server Component (page.tsx)
+  → UserRefreshClient.refresh() → findSpreadsheetByName → readSpreadsheetData
+  → parseSpreadsheetRows + computeTodayAndFillHistory (using tz cookie)
+  → render full HTML with today's habits
+
+Mutation (e.g. increment):
+  user clicks → useOptimistic updates UI instantly (zero latency)
+  → Server Action: refresh token → findSpreadsheetByName → read → mutate → write Sheets
+  → revalidatePath('/') → Server Component re-renders with authoritative data
+```
+
+## Cookies
+
+All cookies: `httpOnly`, `secure` in production, `sameSite: lax`, 30-day expiry.
+
+- `google_refresh_token` — OAuth refresh token, set by `loginAction`
+- `tz` — IANA timezone string (e.g. `"Europe/Moscow"`), set by `TimezoneDetector`
 
 ## Directory Structure
 
 ```text
 src/
 ├── app/
-│   ├── api/
-│   │   ├── auth/google/
-│   │   │   ├── route.ts              # Google OAuth handler (code → tokens)
-│   │   │   └── refresh-token/route.ts # Token refresh endpoint
-│   │   └── habits/
-│   │       └── route.ts              # GET /api/habits — reads from Google Sheets (server-side)
+│   ├── api/auth/google/
+│   │   ├── route.ts              # POST — exchanges OAuth code for tokens
+│   │   └── refresh-token/route.ts # POST — refreshes access token (legacy, unused)
 │   ├── components/
 │   │   ├── HabbitButton.tsx      # Single habit UI (increment / edit / delete)
 │   │   ├── AddHabbit.tsx         # Add habit form
@@ -57,54 +79,58 @@ src/
 │   │   ├── AddNote.tsx           # Add note form
 │   │   ├── HistoryView.tsx       # Historical snapshots view
 │   │   ├── BottomNavigation.tsx  # Today / History tab switch
-│   │   ├── IntegrationPannel.tsx # Google Sheets sync status & button
+│   │   ├── LoginView.tsx         # Shown when not authenticated
+│   │   ├── TimezoneDetector.tsx  # Sets tz cookie on mount (no visible UI)
 │   │   └── Modal.tsx             # Reusable modal wrapper
 │   ├── helpers/
 │   │   └── date.ts               # getDateString(), getDate00()
-│   ├── hooks/
-│   │   └── useHabitsSync.ts      # SWR hook — polls /api/habits every 30s, updates Redux
-│   ├── services/
-│   │   └── apiLocalStorage.ts    # localStorage CRUD layer
 │   ├── types/
 │   │   ├── habbit.ts             # IHabbit
 │   │   ├── dailySnapshot.ts      # IDailySnapshot
 │   │   ├── note.ts               # INote
-│   │   ├── googleState.ts        # GoogleState enum
 │   │   └── habitsData.ts         # IHabitsData (combined payload)
-│   ├── page.tsx                  # Main page — orchestrates UI & sync
-│   ├── layout.tsx
-│   └── StoreProvider.tsx
+│   ├── actions.ts                # All Server Actions (auth + habits + notes)
+│   ├── HabitsView.tsx            # Client Component — useOptimistic + handlers
+│   ├── page.tsx                  # Async Server Component — fetches & renders habits
+│   └── layout.tsx
 └── lib/
     ├── googleSheets/
-    │   └── googleSheetsApi.ts    # Shared Google API utilities (no "use client")
-    ├── features/
-    │   ├── habitsAndNotes/
-    │   │   ├── habitsSlice.ts
-    │   │   ├── notesSlice.ts
-    │   │   ├── snapshotsSlice.ts
-    │   │   └── thunks.ts
-    │   └── googleSheets/
-    │       ├── googleSheetsSlice.ts
-    │       └── thunks.ts         # onLogin, uploadDataToGoogle, onLogout
-    ├── middleware/
-    │   └── localStorageMiddleware.ts  # Persists Redux state to localStorage
-    ├── hooks.ts                       # Typed useAppSelector / useAppDispatch
-    └── store.ts
+    │   └── googleSheetsApi.ts    # Google Sheets utilities (read/write/parse)
+    └── habits/
+        └── stateHelpers.ts       # computeTodayAndFillHistory, buildEmptySnapshot
 ```
+
+## Server Actions (`src/app/actions.ts`)
+
+Auth:
+
+- `loginAction(refreshToken)` — stores `google_refresh_token` cookie only (no Google API calls)
+- `logoutAction()` — clears `google_refresh_token` cookie
+- `setTimezoneAction(tz)` — stores `tz` cookie
+
+Habits / Notes — each action follows this pattern:
+
+1. Read `google_refresh_token` + `tz` from cookies
+2. `UserRefreshClient.refreshAccessToken()` → fresh `accessToken`
+3. `findSpreadsheetByName(accessToken, SPREADSHEET_NAME)` — look up spreadsheet by name every time (no cached ID)
+4. `readSpreadsheetData` → `parseSpreadsheetRows` → `computeTodayAndFillHistory`
+5. Apply mutation in memory
+6. `writeSpreadsheetData` — full batchUpdate
+7. `revalidatePath('/')` — triggers server re-render
 
 ## Data Models
 
 ```typescript
 // src/app/types/habbit.ts
 interface IHabbit {
-  id: string;   // UUID
-  text: string; // Habit name
+  id: string;   // deterministic hash of habit name (stable across parses)
+  text: string; // Habit name = spreadsheet column header
 }
 
 // src/app/types/note.ts
 interface INote {
-  id: string;
-  name: string;
+  id: string;   // deterministic hash of note name
+  name: string; // Note name = spreadsheet column header
 }
 
 // src/app/types/dailySnapshot.ts
@@ -122,68 +148,43 @@ interface IDailySnapshot {
 }
 ```
 
-## localStorage Keys
+**Important:** Habit/note IDs are derived from column names via `stableId()` (FNV-1a hash) in
+`parseSpreadsheetRows`. They are NOT random UUIDs — this is required so Server Actions can match
+client-side IDs to freshly-parsed server-side data.
 
-| Key               | Value                              |
-|-------------------|------------------------------------|
-| `habits`          | `IHabbit[]`                        |
-| `notes`           | `INote[]`                          |
-| `dailySnapshots`  | `IDailySnapshot[]` sorted by date  |
-| `habitsResetDate` | `"YYYY-MM-DD"` — last daily reset  |
-
-## Google Sheets Integration
-
-**Flow:**
-
-1. User authenticates → tokens dispatched to Redux, refresh token saved to `localStorage`
-2. `useHabitsSync` SWR hook detects `refreshToken` in Redux → starts polling `GET /api/habits`
-3. `GET /api/habits` (server-side): refreshes access token via `UserRefreshClient`, reads spreadsheet
-4. If no spreadsheet: `uploadDataToGoogle` thunk creates it from local Redux state
-5. On every data change: `uploadDataToGoogle` thunk writes to Sheets via `batchUpdate`
-6. SWR revalidates every 30s and on window focus
-
-**Spreadsheet format:**
+## Google Sheets Format
 
 - Row 0: category headers (`"Habits"`, `"Notes"`)
 - Row 1: column names (habit/note names)
 - Row 2+: daily rows — date in col 0, habit values as `"actual/needed"`, note texts
 
-**Deletion vs. empty text — invariant (applies to both habits and notes):**
+**Deletion vs. empty text invariant** (enforced in `googleSheetsApi.ts`):
 
 The column for a habit/note always stays in Sheets (needed for history display).
-Distinction is made by the **cell value**, not the column presence:
+Distinction is made by the **cell value**:
 
-- `"actual/needed"` (habit) / any text (note) — item exists, data recorded
-- `"0/needed"` (habit) / `"No text for that day"` (note) — item exists, nothing recorded that day
-- `""` empty cell — item was **deleted** from this day's snapshot
+- `"actual/needed"` (habit) / any text (note) — item recorded that day
+- `"0/needed"` (habit) / `"No text for that day"` (note) — item exists, nothing recorded (sentinel)
+- `""` empty cell — item was deleted from this day's snapshot
 
-Rules enforced in `src/lib/googleSheets/googleSheetsApi.ts`:
+Rules:
 
-- **`writeSpreadsheetData`**: if item is present in the snapshot → always write cell (use `"No text for that day"` sentinel for empty note text, `"0/N"` for habits). If item is absent from snapshot (deleted) → cell stays empty.
-- **`parseSpreadsheetRows`**: empty cell → item not included in snapshot (treated as deleted for that day and onwards). Non-empty cell → item included (sentinel mapped back to `noteText: ""`).
-- **`setTodayAndFillHistory`** / **`fillHistory`**: when creating new day snapshots, copies items from the last snapshot with reset values (`didCount: 0`, `noteText: ""`). These become sentinel values on next upload → item survives into future days.
-
-**Google State machine** (`src/app/types/googleState.ts`):
-`NOT_CONNECTED` → `UPDATING` → `CONNECTED` / `ERROR`
-
-**Key modules:**
-
-- `src/lib/googleSheets/googleSheetsApi.ts` — shared utilities: `findSpreadsheetByName`, `readSpreadsheetData`, `parseSpreadsheetRows`, `writeSpreadsheetData`, `createSpreadsheet`
-- `src/app/api/habits/route.ts` — server-side `GET /api/habits`, handles token refresh via `UserRefreshClient`
-- `src/app/hooks/useHabitsSync.ts` — SWR polling hook (`refreshInterval: 30_000`)
-- `src/lib/features/googleSheets/thunks.ts` — `onLogin`, `uploadDataToGoogle`, `onLogout`
+- **`writeSpreadsheetData`**: item present in snapshot → always write cell (use sentinel for empty note text). Item absent → cell stays empty.
+- **`parseSpreadsheetRows`**: empty cell → item excluded from snapshot. Sentinel → item included with empty `noteText`.
+- **`computeTodayAndFillHistory`**: copies items from last snapshot with reset values → become sentinel on next write → item survives into future days.
 
 ## Component Patterns
 
 - Modal-based forms for all CRUD (add/edit habits, notes)
-- Optimistic UI updates — Redux state updates first, persistence follows
+- `useOptimistic` for instant UI — mutations appear immediately, server confirms asynchronously
 - Pastel colors generated from habit ID via HSL
 - Form validation with per-field error states
 
-## Date Utilities (`src/app/helpers/date.ts`)
+## Date & Timezone
 
-- `getDateString(date)` → `"YYYY-MM-DD"`
-- `getDate00(date)` → date normalized to 00:00:00 (for day comparisons)
+- `tz` cookie (IANA timezone string) set by `TimezoneDetector` component on first visit
+- Server uses `new Intl.DateTimeFormat("en-CA", { timeZone: tz }).format(new Date())` to get `"YYYY-MM-DD"`
+- First visit falls back to UTC; `TimezoneDetector` corrects it immediately
 
 ## Path Alias
 
