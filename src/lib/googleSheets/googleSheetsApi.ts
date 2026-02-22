@@ -149,7 +149,12 @@ export function parseSpreadsheetRows(rows: string[][]): HabitsData {
       const noteData = notes
         .map((note, idx) => {
           const cell = row[habits.length + idx + 1] ?? "";
-          return cell ? { noteId: note.id, noteText: cell } : null;
+          if (!cell) return null; // empty cell = note was deleted from this day's snapshot
+          return {
+            noteId: note.id,
+            // sentinel "No text for that day" maps back to empty string in-app
+            noteText: cell === "No text for that day" ? "" : cell,
+          };
         })
         .filter((n): n is NonNullable<typeof n> => n !== null);
 
@@ -208,8 +213,10 @@ export async function writeSpreadsheetData(
     }
     for (const n of snap.notes ?? []) {
       const name = noteIdToName.get(n.noteId);
-      if (name && noteNames.includes(name) && n.noteText) {
-        day.set(name, n.noteText);
+      if (name && noteNames.includes(name)) {
+        // Write sentinel when text is empty so the cell is non-empty → note survives round-trip.
+        // Empty cell means "deleted from this day's snapshot".
+        day.set(name, n.noteText.trim() || "No text for that day");
       }
     }
   }
