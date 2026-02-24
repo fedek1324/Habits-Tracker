@@ -148,6 +148,21 @@ interface IDailySnapshot {
 - Row 1: column names (habit/note names)
 - Row 2+: daily rows — date in col 0, habit values as `"actual/needed"`, note texts
 
+**Deletion vs. empty text — invariant (applies to both habits and notes):**
+
+The column for a habit/note always stays in Sheets (needed for history display).
+Distinction is made by the **cell value**, not the column presence:
+
+- `"actual/needed"` (habit) / any text (note) — item exists, data recorded
+- `"0/needed"` (habit) / `"No text for that day"` (note) — item exists, nothing recorded that day
+- `""` empty cell — item was **deleted** from this day's snapshot
+
+Rules enforced in `src/lib/googleSheets/googleSheetsApi.ts`:
+
+- **`writeSpreadsheetData`**: if item is present in the snapshot → always write cell (use `"No text for that day"` sentinel for empty note text, `"0/N"` for habits). If item is absent from snapshot (deleted) → cell stays empty.
+- **`parseSpreadsheetRows`**: empty cell → item not included in snapshot (treated as deleted for that day and onwards). Non-empty cell → item included (sentinel mapped back to `noteText: ""`).
+- **`setTodayAndFillHistory`** / **`fillHistory`**: when creating new day snapshots, copies items from the last snapshot with reset values (`didCount: 0`, `noteText: ""`). These become sentinel values on next upload → item survives into future days.
+
 **Google State machine** (`src/app/types/googleState.ts`):
 `NOT_CONNECTED` → `UPDATING` → `CONNECTED` / `ERROR`
 
