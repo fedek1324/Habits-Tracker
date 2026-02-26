@@ -42,6 +42,8 @@ function stableId(prefix: string, name: string): string {
 // ─────────────────────────────────────────────────────────
 
 export const SPREADSHEET_NAME = "My habits tracker";
+const SHEET_TITLE = "Habits Data";
+const SHEET_ID = 0;
 
 // ─────────────────────────────────────────────────────────
 // Errors
@@ -100,20 +102,9 @@ export async function readSpreadsheetData(
   accessToken: string,
   spreadsheetId: string
 ): Promise<string[][] | null> {
-  // Get sheet title
-  const metaRes = await apiFetch(
-    accessToken,
-    `https://sheets.googleapis.com/v4/spreadsheets/${spreadsheetId}`
-  );
-  if (!metaRes.ok) throw new Error(`Sheets metadata error: ${metaRes.status}`);
-
-  const meta = await metaRes.json();
-  const sheetTitle: string = meta.sheets[0].properties.title;
-
-  // Read values
   const dataRes = await apiFetch(
     accessToken,
-    `https://sheets.googleapis.com/v4/spreadsheets/${spreadsheetId}/values/${sheetTitle}`
+    `https://sheets.googleapis.com/v4/spreadsheets/${spreadsheetId}/values/${SHEET_TITLE}`
   );
   if (!dataRes.ok) throw new Error(`Sheets read error: ${dataRes.status}`);
 
@@ -195,15 +186,7 @@ export async function writeSpreadsheetData(
   notes: INote[],
   snapshots: IDailySnapshot[]
 ): Promise<void> {
-  // Get sheet ID
-  const metaRes = await apiFetch(
-    accessToken,
-    `https://sheets.googleapis.com/v4/spreadsheets/${spreadsheetId}`
-  );
-  if (!metaRes.ok) throw new Error(`Sheets metadata error: ${metaRes.status}`);
-
-  const meta = await metaRes.json();
-  const sheetId: number = meta.sheets[0].properties.sheetId;
+  const sheetId = SHEET_ID;
 
   const habitNames = [...new Set(habits.map((h) => h.text))].sort();
   const noteNames = [...new Set(notes.map((n) => n.name))].sort();
