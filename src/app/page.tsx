@@ -29,21 +29,43 @@ export default async function Page() {
   }
 
   try {
-    const client = new UserRefreshClient(
-      process.env.GOOGLE_CLIENT_ID!,
-      process.env.GOOGLE_CLIENT_SECRET!,
-      refreshToken
-    );
-    const { credentials } = await client.refreshAccessToken();
-    const accessToken = credentials.access_token!;
+    // Access token: use cached cookie if still fresh, otherwise refresh
+    let accessToken: string;
+    const cachedToken = store.get("google_access_token")?.value;
+    const tokenExpiry = Number(store.get("google_token_expiry")?.value ?? "0");
 
-    // Find or create the spreadsheet — no cached ID needed
-    let spreadsheet = await findSpreadsheetByName(accessToken, SPREADSHEET_NAME);
-    if (!spreadsheet) {
-      spreadsheet = await createSpreadsheet(accessToken, [], [], []);
+    if (cachedToken && tokenExpiry > Date.now() + 60_000) {
+      accessToken = cachedToken;
+    } else {
+      const client = new UserRefreshClient(
+        process.env.GOOGLE_CLIENT_ID!,
+        process.env.GOOGLE_CLIENT_SECRET!,
+        refreshToken
+      );
+      const { credentials } = await client.refreshAccessToken();
+      accessToken = credentials.access_token!;
+      // Note: page.tsx is a Server Component — it cannot set cookies.
+      // The cache will be populated on the first Server Action call.
     }
 
-    const rows = await readSpreadsheetData(accessToken, spreadsheet.id);
+    // Spreadsheet: use cached ID if available, otherwise find or create
+    let spreadsheetId: string;
+    let spreadsheetUrl: string;
+    const cachedSpreadsheetId = store.get("google_spreadsheet_id")?.value;
+
+    if (cachedSpreadsheetId) {
+      spreadsheetId = cachedSpreadsheetId;
+      spreadsheetUrl = `https://docs.google.com/spreadsheets/d/${spreadsheetId}/edit`;
+    } else {
+      let spreadsheet = await findSpreadsheetByName(accessToken, SPREADSHEET_NAME);
+      if (!spreadsheet) {
+        spreadsheet = await createSpreadsheet(accessToken, [], [], []);
+      }
+      spreadsheetId = spreadsheet.id;
+      spreadsheetUrl = spreadsheet.url;
+    }
+
+    const rows = await readSpreadsheetData(accessToken, spreadsheetId);
     const { habits, notes, snapshots } = rows
       ? parseSpreadsheetRows(rows)
       : { habits: [], notes: [], snapshots: [] };
@@ -63,7 +85,7 @@ export default async function Page() {
           notes={notes}
           todaySnapshot={todaySnapshot}
           allSnapshots={allSnapshots}
-          spreadsheetUrl={spreadsheet.url}
+          spreadsheetUrl={spreadsheetUrl}
           todayStr={todayStr}
         />
       </>

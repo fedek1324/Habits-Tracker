@@ -50,22 +50,42 @@ export async function getServerContext(): Promise<ServerContext> {
 
   if (!refreshToken) throw new Error("Not authenticated");
 
-  const client = new UserRefreshClient(
-    process.env.GOOGLE_CLIENT_ID!,
-    process.env.GOOGLE_CLIENT_SECRET!,
-    refreshToken
-  );
-  const { credentials } = await client.refreshAccessToken();
-  if (!credentials.access_token) throw new Error("Token refresh failed");
+  // --- Access token: use cached or refresh ---
+  let accessToken = store.get("google_access_token")?.value;
+  const tokenExpiry = Number(store.get("google_token_expiry")?.value ?? "0");
 
-  // Look up the spreadsheet by name every time — simple and reliable,
-  // avoids stale spreadsheet_id cookies causing silent failures.
-  const spreadsheet = await findSpreadsheetByName(credentials.access_token, SPREADSHEET_NAME);
-  if (!spreadsheet) throw new Error("Spreadsheet not found");
+  if (!accessToken || tokenExpiry <= Date.now() + 60_000) {
+    const client = new UserRefreshClient(
+      process.env.GOOGLE_CLIENT_ID!,
+      process.env.GOOGLE_CLIENT_SECRET!,
+      refreshToken
+    );
+    const { credentials } = await client.refreshAccessToken();
+    if (!credentials.access_token) throw new Error("Token refresh failed");
+
+    accessToken = credentials.access_token;
+    const maxAge = credentials.expiry_date
+      ? Math.max(0, Math.floor((credentials.expiry_date - Date.now()) / 1000))
+      : 3600;
+    store.set("google_access_token", accessToken, { ...COOKIE_OPTS, maxAge });
+    store.set("google_token_expiry", String(credentials.expiry_date ?? Date.now() + maxAge * 1000), {
+      ...COOKIE_OPTS,
+      maxAge,
+    });
+  }
+
+  // --- Spreadsheet ID: use cached or lookup ---
+  let spreadsheetId = store.get("google_spreadsheet_id")?.value;
+
+  if (!spreadsheetId) {
+    const spreadsheet = await findSpreadsheetByName(accessToken, SPREADSHEET_NAME);
+    if (!spreadsheet) throw new Error("Spreadsheet not found");
+    spreadsheetId = spreadsheet.id;
+    store.set("google_spreadsheet_id", spreadsheetId, COOKIE_OPTS);
+  }
 
   const todayStr = new Intl.DateTimeFormat("en-CA", { timeZone: tz }).format(new Date());
-
-  return { accessToken: credentials.access_token, spreadsheetId: spreadsheet.id, todayStr };
+  return { accessToken, spreadsheetId, todayStr };
 }
 
 /** Read + parse current Sheets data, compute today's snapshot, return full mutable state. */

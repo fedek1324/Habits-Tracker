@@ -14,6 +14,9 @@ export async function loginAction(refreshToken: string): Promise<void> {
 
 export async function logoutAction(): Promise<void> {
   await deleteCookie("google_refresh_token");
+  await deleteCookie("google_access_token");
+  await deleteCookie("google_token_expiry");
+  await deleteCookie("google_spreadsheet_id");
   revalidatePath("/");
 }
 
