@@ -43,7 +43,6 @@ function stableId(prefix: string, name: string): string {
 
 export const SPREADSHEET_NAME = "My habits tracker";
 const SHEET_TITLE = "Habits Data";
-const SHEET_ID = 0;
 
 // ─────────────────────────────────────────────────────────
 // Errors
@@ -186,7 +185,13 @@ export async function writeSpreadsheetData(
   notes: INote[],
   snapshots: IDailySnapshot[]
 ): Promise<void> {
-  const sheetId = SHEET_ID;
+  const metaRes = await apiFetch(
+    accessToken,
+    `https://sheets.googleapis.com/v4/spreadsheets/${spreadsheetId}`
+  );
+  if (!metaRes.ok) throw new Error(`Sheets metadata error: ${metaRes.status}`);
+  const meta = await metaRes.json();
+  const sheetId: number = meta.sheets[0].properties.sheetId;
 
   const habitNames = [...new Set(habits.map((h) => h.text))].sort();
   const noteNames = [...new Set(notes.map((n) => n.name))].sort();
