@@ -1,6 +1,6 @@
 import { cookies } from "next/headers";
 import { UserRefreshClient } from "google-auth-library";
-import HabitsView from "./HabitsView";
+import HabitsView from "./components/HabitsView";
 import LoginView from "./components/LoginView";
 import TimezoneDetector from "./components/TimezoneDetector";
 import {

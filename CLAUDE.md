@@ -82,39 +82,50 @@ All cookies: `httpOnly`, `secure` in production, `sameSite: lax`, 30-day expiry.
 src/
 ├── app/
 │   ├── api/auth/google/
-│   │   ├── route.ts              # POST — exchanges OAuth code for tokens
-│   │   └── refresh-token/route.ts # POST — refreshes access token (legacy, unused)
+│   │   └── route.ts              # POST — exchanges OAuth code for tokens
 │   ├── components/
-│   │   ├── HabbitButton.tsx      # Single habit UI (increment / edit / delete)
-│   │   ├── AddHabbit.tsx         # Add habit form
-│   │   ├── NoteButton.tsx        # Single note UI
-│   │   ├── AddNote.tsx           # Add note form
+│   │   ├── habits/
+│   │   │   ├── HabitButton.tsx   # Single habit UI (increment / edit / delete)
+│   │   │   └── AddHabit.tsx      # Add habit form
+│   │   ├── notes/
+│   │   │   ├── NoteButton.tsx    # Single note UI
+│   │   │   └── AddNote.tsx       # Add note form
+│   │   ├── HabitsView.tsx        # Client Component — useOptimistic + handlers
 │   │   ├── HistoryView.tsx       # Historical snapshots view
 │   │   ├── BottomNavigation.tsx  # Today / History tab switch
 │   │   ├── LoginView.tsx         # Shown when not authenticated
 │   │   ├── TimezoneDetector.tsx  # Sets tz cookie on mount (no visible UI)
 │   │   └── Modal.tsx             # Reusable modal wrapper
-│   ├── helpers/
-│   │   └── date.ts               # getDateString(), getDate00()
-│   ├── types/
-│   │   ├── habbit.ts             # IHabbit
-│   │   ├── dailySnapshot.ts      # IDailySnapshot
-│   │   ├── note.ts               # INote
-│   │   └── habitsData.ts         # IHabitsData (combined payload)
-│   ├── actions.ts                # All Server Actions (auth + habits + notes)
-│   ├── HabitsView.tsx            # Client Component — useOptimistic + handlers
+│   ├── actions/
+│   │   ├── _shared.ts            # getServerContext, readState, commitState, cookie helpers
+│   │   ├── auth.ts               # loginAction, logoutAction, setTimezoneAction
+│   │   ├── habits.ts             # increment/add/delete/editHabitAction
+│   │   └── notes.ts              # add/edit/deleteNoteAction
 │   ├── page.tsx                  # Async Server Component — fetches & renders habits
 │   └── layout.tsx
 └── lib/
+    ├── types/
+    │   ├── habit.ts              # IHabit
+    │   ├── note.ts               # INote
+    │   ├── dailySnapshot.ts      # IDailySnapshot
+    │   └── habitsData.ts         # IHabitsAndNotesData (combined payload)
+    ├── utils/
+    │   └── date.ts               # getDateString(), getDate00()
     ├── googleSheets/
     │   └── googleSheetsApi.ts    # Google Sheets utilities (read/write/parse)
     └── habits/
         └── stateHelpers.ts       # computeTodayAndFillHistory, buildEmptySnapshot
 ```
 
-## Server Actions (`src/app/actions.ts`)
+## Server Actions (`src/app/actions/`)
 
-Auth:
+Shared infrastructure (`_shared.ts` — not exported to client):
+
+- `getServerContext()` — refresh token → access token → spreadsheet ID → today's date
+- `readState(ctx)` — read Sheets → parse → compute today's snapshot
+- `commitState(ctx, habits, notes, snapshots)` — write Sheets + revalidatePath('/')
+
+Auth (`auth.ts`):
 
 - `loginAction(refreshToken)` — stores `google_refresh_token` cookie only (no Google API calls)
 - `logoutAction()` — clears `google_refresh_token` cookie
@@ -122,36 +133,33 @@ Auth:
 
 Habits / Notes — each action follows this pattern:
 
-1. Read `google_refresh_token` + `tz` from cookies
-2. `UserRefreshClient.refreshAccessToken()` → fresh `accessToken`
-3. `findSpreadsheetByName(accessToken, SPREADSHEET_NAME)` — look up spreadsheet by name every time (no cached ID)
-4. `readSpreadsheetData` → `parseSpreadsheetRows` → `computeTodayAndFillHistory`
-5. Apply mutation in memory
-6. `writeSpreadsheetData` — full batchUpdate
-7. `revalidatePath('/')` — triggers server re-render
+1. `getServerContext()` — refresh token, get access token, find spreadsheet, get today's date
+2. `readState(ctx)` — read spreadsheet, parse rows, compute today's snapshot
+3. Apply mutation in memory
+4. `commitState(ctx, ...)` — write to Sheets, revalidatePath('/')
 
 ## Data Models
 
 ```typescript
-// src/app/types/habbit.ts
-interface IHabbit {
+// src/lib/types/habit.ts
+interface IHabit {
   id: string;   // deterministic hash of habit name (stable across parses)
   text: string; // Habit name = spreadsheet column header
 }
 
-// src/app/types/note.ts
+// src/lib/types/note.ts
 interface INote {
   id: string;   // deterministic hash of note name
   name: string; // Note name = spreadsheet column header
 }
 
-// src/app/types/dailySnapshot.ts
+// src/lib/types/dailySnapshot.ts
 interface IDailySnapshot {
   date: string; // "YYYY-MM-DD"
-  habbits: Array<{
-    habbitId: string;
-    habbitNeedCount: number;
-    habbitDidCount: number;
+  habits: Array<{
+    habitId: string;
+    habitNeedCount: number;
+    habitDidCount: number;
   }>;
   notes: Array<{
     noteId: string;

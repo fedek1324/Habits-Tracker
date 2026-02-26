@@ -1,8 +1,8 @@
-import IHabbit from "@/src/app/types/habbit";
+import IHabit from "@/src/lib/types/habit";
 import { FormEventHandler, useEffect, useState } from "react";
 import { LuTrash } from "react-icons/lu";
 import { MdOutlineEdit } from "react-icons/md";
-import Modal from "./Modal";
+import Modal from "../Modal";
 
 function getPastelColorFromId(id: string): string {
   // Simple hash function
@@ -18,17 +18,17 @@ function getPastelColorFromId(id: string): string {
   return `hsl(${hue}, 80%, 94%)`;
 }
 
-interface HabbitButtonProps {
-  habbit: IHabbit;
+interface HabitButtonProps {
+  habit: IHabit;
   currentCount: number;
   needCount: number;
   onIncrement: (id: string) => void;
   onDelete: (id: string) => void;
-  onEdit: (habbit: IHabbit, newNeedCount: number, newActualCount: number) => void;
+  onEdit: (habit: IHabit, newNeedCount: number, newActualCount: number) => void;
 }
 
-const HabitButton: React.FC<HabbitButtonProps> = ({
-  habbit,
+const HabitButton: React.FC<HabitButtonProps> = ({
+  habit,
   currentCount,
   needCount,
   onIncrement,
@@ -39,61 +39,61 @@ const HabitButton: React.FC<HabbitButtonProps> = ({
   const completed = currentCount === needCount;
 
   const [isEditModalOpen, setEditModalOpen] = useState<boolean>(false);
-  const [newHabbitText, setNewHabbitText] = useState<string>(habbit.text);
-  const [newHabbitCurrentCount, setNewHabbitCurrentCount] = useState<string>(
+  const [newHabitText, setNewHabitText] = useState<string>(habit.text);
+  const [newHabitCurrentCount, setNewHabitCurrentCount] = useState<string>(
     String(currentCount)
   );
-  const [newHabbitNeedCount, setNewHabbitNeedCount] = useState<string>(
+  const [newHabitNeedCount, setNewHabitNeedCount] = useState<string>(
     String(needCount)
   );
   const [currentCountError, setCurrentCountError] = useState<string>(""); // for error message
   const [needCountError, setNeedCountError] = useState<string>(""); // for error message
   const [textError, setTextError] = useState<string>(""); // for error message
 
-  const handleEditHabbit: FormEventHandler<HTMLFormElement> = async (e) => {
+  const handleEditHabit: FormEventHandler<HTMLFormElement> = async (e) => {
     e.preventDefault();
 
-    let habbitNeedCount;
-    if (!/^\d+$/.test(newHabbitNeedCount)) {
+    let habitNeedCount;
+    if (!/^\d+$/.test(newHabitNeedCount)) {
       setNeedCountError("Enter a valid number");
       return;
     } else {
-      habbitNeedCount = parseInt(newHabbitNeedCount, 10);
-      if (!(habbitNeedCount > 0 && habbitNeedCount < 1e6)) {
+      habitNeedCount = parseInt(newHabitNeedCount, 10);
+      if (!(habitNeedCount > 0 && habitNeedCount < 1e6)) {
         setNeedCountError("Enter a valid number more that 0");
         return;
       }
     }
 
-    let habbitCurrentCount;
-    if (!/^\d+$/.test(newHabbitCurrentCount)) {
+    let habitCurrentCount;
+    if (!/^\d+$/.test(newHabitCurrentCount)) {
       setCurrentCountError("Enter a valid number");
       return;
     } else {
-      habbitCurrentCount = parseInt(newHabbitCurrentCount, 10);
-      if (!(habbitCurrentCount >= 0 && habbitCurrentCount < 1e6 && 
-        habbitCurrentCount <= habbitNeedCount
+      habitCurrentCount = parseInt(newHabitCurrentCount, 10);
+      if (!(habitCurrentCount >= 0 && habitCurrentCount < 1e6 &&
+        habitCurrentCount <= habitNeedCount
       )) {
-        setCurrentCountError("Enter a valid number less or equal to habbit aim");
+        setCurrentCountError("Enter a valid number less or equal to habit aim");
         return;
       }
     }
 
-    if (newHabbitText === "" || newHabbitText.length > 1e3) {
+    if (newHabitText === "" || newHabitText.length > 1e3) {
       setTextError("Enter a valid text");
       return;
     }
 
-    const updatedHabbit = {
-      id: habbit.id,
-      text: newHabbitText.trim(),
+    const updatedHabit = {
+      id: habit.id,
+      text: newHabitText.trim(),
     };
 
-    onEdit(updatedHabbit, habbitNeedCount ?? 1, habbitCurrentCount ?? 0);
+    onEdit(updatedHabit, habitNeedCount ?? 1, habitCurrentCount ?? 0);
 
-    setNewHabbitText("");
-    setNewHabbitCurrentCount("");
-    setNewHabbitNeedCount("");
+    setNewHabitText("");
+    setNewHabitCurrentCount("");
+    setNewHabitNeedCount("");
 
     setCurrentCountError("");
     setNeedCountError("");
@@ -103,27 +103,27 @@ const HabitButton: React.FC<HabbitButtonProps> = ({
 
   useEffect(() => {
     if (isEditModalOpen) {
-      setNewHabbitText(habbit.text);
-      setNewHabbitCurrentCount(String(currentCount));
-      setNewHabbitNeedCount(String(needCount));
+      setNewHabitText(habit.text);
+      setNewHabitCurrentCount(String(currentCount));
+      setNewHabitNeedCount(String(needCount));
     }
-  }, [isEditModalOpen, habbit, currentCount, needCount]);
+  }, [isEditModalOpen, habit, currentCount, needCount]);
 
   return (
     <div
       className={`
-        rounded-2xl 
-        p-4 
-        w-full 
-        flex 
-        items-center 
-        justify-between 
-        shadow-sm 
-        hover:shadow-md 
-        transition-all 
-      
+        rounded-2xl
+        p-4
+        w-full
+        flex
+        items-center
+        justify-between
+        shadow-sm
+        hover:shadow-md
+        transition-all
+
       `}
-      style={{ backgroundColor: getPastelColorFromId(habbit.id) }}
+      style={{ backgroundColor: getPastelColorFromId(habit.id) }}
     >
       <div className="flex items-center space-x-4">
         {/* Text */}
@@ -131,9 +131,9 @@ const HabitButton: React.FC<HabbitButtonProps> = ({
           <span
             style={{ wordBreak: "break-word" }}
             className="block text-lg font-medium text-gray-900"
-            title={habbit.text}
+            title={habit.text}
           >
-            {habbit.text}
+            {habit.text}
           </span>
           {subtitle && (
             <span className="block text-sm text-gray-600">{subtitle}</span>
@@ -144,7 +144,7 @@ const HabitButton: React.FC<HabbitButtonProps> = ({
       <div className="flex space-x-2">
         {/* Right part - action button */}
         <button
-          onClick={() => onIncrement(habbit.id)}
+          onClick={() => onIncrement(habit.id)}
           className="rounded-full flex-shrink-0 active:scale-120 duration-30 transition-all hover:shadow-md "
         >
           <div className="w-10 h-10 bg-gray-100 rounded-full flex items-center justify-center">
@@ -181,20 +181,20 @@ const HabitButton: React.FC<HabbitButtonProps> = ({
         </button>
 
         <Modal modalOpen={isEditModalOpen} setModalOpen={setEditModalOpen}>
-          <form onSubmit={handleEditHabbit} className="flex flex-col gap-4">
+          <form onSubmit={handleEditHabit} className="flex flex-col gap-4">
             <h2 className="text-xl font-semibold">Edit habit</h2>
 
-            {/* Habbit name */}
+            {/* Habit name */}
             <div className="flex flex-col">
               <input
                 type="text"
                 placeholder="Habit name"
-                value={newHabbitText}
+                value={newHabitText}
                 onChange={(e) => {
-                  setNewHabbitText(e.target.value);
+                  setNewHabitText(e.target.value);
                   setTextError("");
                 }}
-                aria-label="Habbit name"
+                aria-label="Habit name"
                 className={
                   "border border-gray-300 rounded-lg " +
                   "px-4 py-2 focus:outline-none " +
@@ -215,9 +215,9 @@ const HabitButton: React.FC<HabbitButtonProps> = ({
                 type="text"
                 inputMode="numeric"
                 placeholder="Current repetitions per day"
-                value={newHabbitCurrentCount}
+                value={newHabitCurrentCount}
                 onChange={(e) => {
-                  setNewHabbitCurrentCount(e.target.value);
+                  setNewHabitCurrentCount(e.target.value);
                   setCurrentCountError("");
                 }}
                 aria-label="Repetitions per day"
@@ -241,9 +241,9 @@ const HabitButton: React.FC<HabbitButtonProps> = ({
                 type="text"
                 inputMode="numeric"
                 placeholder="Need repetitions per day"
-                value={newHabbitNeedCount}
+                value={newHabitNeedCount}
                 onChange={(e) => {
-                  setNewHabbitNeedCount(e.target.value);
+                  setNewHabitNeedCount(e.target.value);
                   setNeedCountError("");
                 }}
                 aria-label="Repetitions per day"
@@ -261,7 +261,7 @@ const HabitButton: React.FC<HabbitButtonProps> = ({
               )}
             </div>
 
-            {/* Sumbit button */}
+            {/* Submit button */}
             <button
               type="submit"
               className="bg-blue-500 text-white font-medium py-2 rounded-lg hover:bg-blue-600 transition-colors"
@@ -273,7 +273,7 @@ const HabitButton: React.FC<HabbitButtonProps> = ({
 
         {/* Right part - delete button */}
         <button
-          onClick={() => onDelete(habbit.id)}
+          onClick={() => onDelete(habit.id)}
           className="rounded-full flex-shrink-0 active:scale-120 duration-30 transition-all hover:shadow-md "
         >
           <div className="w-10 h-10 bg-gray-100 rounded-full flex items-center justify-center">

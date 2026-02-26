@@ -1,13 +1,13 @@
-import IDailySnapshot from "@/src/app/types/dailySnapshot";
-import IHabbit from "@/src/app/types/habbit";
-import INote from "@/src/app/types/note";
+import IDailySnapshot from "@/src/lib/types/dailySnapshot";
+import IHabit from "@/src/lib/types/habit";
+import INote from "@/src/lib/types/note";
 
 // ─────────────────────────────────────────────────────────
 // Types
 // ─────────────────────────────────────────────────────────
 
 export type HabitsData = {
-  habits: IHabbit[];
+  habits: IHabit[];
   notes: INote[];
   snapshots: IDailySnapshot[];
 };
@@ -146,22 +146,22 @@ export function parseSpreadsheetRows(rows: string[][]): HabitsData {
 
   // IDs must be stable across parses so Server Actions can match them.
   // We derive them deterministically from the column name (which is unique in Sheets).
-  const habits: IHabbit[] = habitNames.map((name) => ({ id: stableId("h", name), text: name }));
+  const habits: IHabit[] = habitNames.map((name) => ({ id: stableId("h", name), text: name }));
   const notes: INote[] = noteNames.map((name) => ({ id: stableId("n", name), name }));
 
   const snapshots: IDailySnapshot[] = dataRows
     .filter((row) => row.length > 0 && row[0])
     .map((row) => {
       const date = row[0];
-      const habbitData = habits
+      const habitData = habits
         .map((habit, idx) => {
           const cell = row[idx + 1] ?? "";
           const match = cell.match(/^(\d+)\/(\d+)$/);
           if (!match) return null;
           return {
-            habbitId: habit.id,
-            habbitDidCount: parseInt(match[1]),
-            habbitNeedCount: parseInt(match[2]),
+            habitId: habit.id,
+            habitDidCount: parseInt(match[1]),
+            habitNeedCount: parseInt(match[2]),
           };
         })
         .filter((h): h is NonNullable<typeof h> => h !== null);
@@ -178,7 +178,7 @@ export function parseSpreadsheetRows(rows: string[][]): HabitsData {
         })
         .filter((n): n is NonNullable<typeof n> => n !== null);
 
-      return { date, habbits: habbitData, notes: noteData };
+      return { date, habits: habitData, notes: noteData };
     });
 
   return { habits, notes, snapshots };
@@ -191,7 +191,7 @@ export function parseSpreadsheetRows(rows: string[][]): HabitsData {
 export async function writeSpreadsheetData(
   accessToken: string,
   spreadsheetId: string,
-  habits: IHabbit[],
+  habits: IHabit[],
   notes: INote[],
   snapshots: IDailySnapshot[]
 ): Promise<void> {
@@ -225,10 +225,10 @@ export async function writeSpreadsheetData(
     if (!dateMap.has(snap.date)) dateMap.set(snap.date, new Map());
     const day = dateMap.get(snap.date)!;
 
-    for (const h of snap.habbits) {
-      const name = habitIdToName.get(h.habbitId);
+    for (const h of snap.habits) {
+      const name = habitIdToName.get(h.habitId);
       if (name && habitNames.includes(name)) {
-        day.set(name, `${h.habbitDidCount}/${h.habbitNeedCount}`);
+        day.set(name, `${h.habitDidCount}/${h.habitNeedCount}`);
       }
     }
     for (const n of snap.notes ?? []) {
@@ -355,7 +355,7 @@ export async function writeSpreadsheetData(
 
 export async function createSpreadsheet(
   accessToken: string,
-  habits: IHabbit[],
+  habits: IHabit[],
   notes: INote[],
   snapshots: IDailySnapshot[]
 ): Promise<SpreadsheetInfo> {

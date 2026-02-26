@@ -2,8 +2,8 @@
 
 import { v4 as uuidv4 } from "uuid";
 import { FormEventHandler, useState } from "react";
-import Modal from "./Modal";
-import INote from "../types/note";
+import Modal from "../Modal";
+import INote from "@/src/lib/types/note";
 
 const AddNote: React.FC<{ onAdd: (note: INote, text: string) => void }> = ({
   onAdd,
@@ -63,7 +63,7 @@ const AddNote: React.FC<{ onAdd: (note: INote, text: string) => void }> = ({
         <form onSubmit={handleSubmitNewNote} className="flex flex-col gap-4">
           <h2 className="text-xl font-semibold">Add new note</h2>
 
-          {/* Habbit name */}
+          {/* Note name */}
           <div className="flex flex-col">
             <input
               type="text"

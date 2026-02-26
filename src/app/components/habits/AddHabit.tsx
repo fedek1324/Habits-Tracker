@@ -2,50 +2,50 @@
 
 import { v4 as uuidv4 } from "uuid";
 import { FormEventHandler, useState } from "react";
-import Modal from "./Modal";
-import IHabbit from "@/src/app/types/habbit";
+import Modal from "../Modal";
+import IHabit from "@/src/lib/types/habit";
 
-const AddHabbit: React.FC<{ onAdd: (habbit: IHabbit, needCount: number) => void }> = ({
+const AddHabit: React.FC<{ onAdd: (habit: IHabit, needCount: number) => void }> = ({
   onAdd,
 }) => {
-  const habbitCountDefault = "";
-  const habbitTextDefault = "";
+  const habitCountDefault = "";
+  const habitTextDefault = "";
   const [modalOpen, setModalOpen] = useState<boolean>(false);
-  const [newHabbitText, setNewHabbitText] = useState<string>(habbitTextDefault);
-  const [newHabbitCount, setNewHabbitCount] = useState<string>(habbitCountDefault);
+  const [newHabitText, setNewHabitText] = useState<string>(habitTextDefault);
+  const [newHabitCount, setNewHabitCount] = useState<string>(habitCountDefault);
   const [countError, setCountError] = useState<string>(""); // for error message
   const [textError, setTextError] = useState<string>(""); // for error message
 
-  const handleSubmitNewHabbit: FormEventHandler<HTMLFormElement> = async (
+  const handleSubmitNewHabit: FormEventHandler<HTMLFormElement> = async (
     e
   ) => {
     e.preventDefault();
 
-    let habbitCount;
-    if (!/^\d+$/.test(newHabbitCount)) {
+    let habitCount;
+    if (!/^\d+$/.test(newHabitCount)) {
       setCountError("Enter a valid number");
       return;
     } else {
-      habbitCount = parseInt(newHabbitCount, 10);
-      if (!(habbitCount > 0 && habbitCount < 1e6)) {
+      habitCount = parseInt(newHabitCount, 10);
+      if (!(habitCount > 0 && habitCount < 1e6)) {
         setCountError("Enter a valid number more than 0");
         return;
       }
     }
 
-    if (newHabbitText === "" || newHabbitText.length > 1e3) {
+    if (newHabitText === "" || newHabitText.length > 1e3) {
       setTextError("Enter a valid text");
       return;
     }
 
-    const newHabbit = {
+    const newHabit = {
       id: uuidv4(),
-      text: newHabbitText.trim(),
+      text: newHabitText.trim(),
     };
 
-    onAdd(newHabbit, habbitCount);
-    setNewHabbitText(habbitTextDefault);
-    setNewHabbitCount(habbitCountDefault);
+    onAdd(newHabit, habitCount);
+    setNewHabitText(habitTextDefault);
+    setNewHabitCount(habitCountDefault);
     setCountError("");
     setTextError("");
     setModalOpen(false);
@@ -64,24 +64,24 @@ const AddHabbit: React.FC<{ onAdd: (habbit: IHabbit, needCount: number) => void 
             clipRule="evenodd"
           />
         </svg>
-        <span>Add habbit</span>
+        <span>Add habit</span>
       </button>
 
       <Modal modalOpen={modalOpen} setModalOpen={setModalOpen}>
-        <form onSubmit={handleSubmitNewHabbit} className="flex flex-col gap-4">
+        <form onSubmit={handleSubmitNewHabit} className="flex flex-col gap-4">
           <h2 className="text-xl font-semibold">Add new habit</h2>
 
-          {/* Habbit name */}
+          {/* Habit name */}
           <div className="flex flex-col">
             <input
               type="text"
               placeholder="Habit name"
-              value={newHabbitText}
+              value={newHabitText}
               onChange={(e) => {
-                setNewHabbitText(e.target.value);
+                setNewHabitText(e.target.value);
                 setTextError("");
               }}
-              aria-label="Habbit name"
+              aria-label="Habit name"
               className={
                 "border border-gray-300 rounded-lg " +
                 "px-4 py-2 focus:outline-none " +
@@ -102,9 +102,9 @@ const AddHabbit: React.FC<{ onAdd: (habbit: IHabbit, needCount: number) => void 
               type="text"
               inputMode="numeric"
               placeholder="Repetitions per day"
-              value={newHabbitCount}
+              value={newHabitCount}
               onChange={(e) => {
-                setNewHabbitCount(e.target.value);
+                setNewHabitCount(e.target.value);
                 setCountError("");
               }}
               aria-label="Repetitions per day"
@@ -134,4 +134,4 @@ const AddHabbit: React.FC<{ onAdd: (habbit: IHabbit, needCount: number) => void 
   );
 };
 
-export default AddHabbit;
+export default AddHabit;

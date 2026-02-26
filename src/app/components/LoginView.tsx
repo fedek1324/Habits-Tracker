@@ -3,7 +3,7 @@
 import { useGoogleLogin } from "@react-oauth/google";
 import { useRouter } from "next/navigation";
 import axios from "axios";
-import { loginAction } from "@/src/app/actions";
+import { loginAction } from "@/src/app/actions/auth";
 
 const SCOPES =
   "https://www.googleapis.com/auth/spreadsheets https://www.googleapis.com/auth/drive.file";

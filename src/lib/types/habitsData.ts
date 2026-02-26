@@ -1,10 +1,9 @@
 import IDailySnapshot from "./dailySnapshot";
-import IHabbit from "./habbit";
+import IHabit from "./habit";
 import INote from "./note";
 
 export default interface IHabitsAndNotesData {
-    habits: IHabbit[],
+    habits: IHabit[],
     notes: INote[],
     snapshots: IDailySnapshot[]
 }
-

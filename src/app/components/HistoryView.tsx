@@ -1,13 +1,13 @@
 "use client";
 
-import IHabbit from "@/src/app/types/habbit";
-import INote from "@/src/app/types/note";
+import IHabit from "@/src/lib/types/habit";
+import INote from "@/src/lib/types/note";
 import { IoCheckmarkCircle } from "react-icons/io5";
-import IDailySnapshot from "@/src/app/types/dailySnapshot";
-import { getDate00 } from "../helpers/date";
+import IDailySnapshot from "@/src/lib/types/dailySnapshot";
+import { getDate00 } from "@/src/lib/utils/date";
 
 interface HistoryViewProps {
-  habits: IHabbit[];
+  habits: IHabit[];
   notes: INote[];
   snapshots: IDailySnapshot[];
   today: Date;
@@ -18,10 +18,10 @@ interface HistoryViewProps {
 type DailyHistory = {
   date: string;
   habits: {
-    habbitId: string;
-    habbitText: string;
-    habbitNeedCount: number;
-    habbitDidCount: number;
+    habitId: string;
+    habitText: string;
+    habitNeedCount: number;
+    habitDidCount: number;
   }[];
   notes: {
     noteId: string;
@@ -49,13 +49,13 @@ const HistoryView: React.FC<HistoryViewProps> = ({
         })
         .map((snapshot) => ({
           date: snapshot.date,
-          habits: snapshot.habbits.map((habbitSnapshot) => {
-            const habit = habits.find((h) => h.id === habbitSnapshot.habbitId);
+          habits: snapshot.habits.map((habitSnapshot) => {
+            const habit = habits.find((h) => h.id === habitSnapshot.habitId);
             return {
-              habbitId: habbitSnapshot.habbitId,
-              habbitText: habit?.text || "Unknown Habit",
-              habbitNeedCount: habbitSnapshot.habbitNeedCount,
-              habbitDidCount: habbitSnapshot.habbitDidCount,
+              habitId: habitSnapshot.habitId,
+              habitText: habit?.text || "Unknown Habit",
+              habitNeedCount: habitSnapshot.habitNeedCount,
+              habitDidCount: habitSnapshot.habitDidCount,
             };
           }),
           notes: (snapshot.notes || []).map((noteSnapshot) => {
@@ -70,7 +70,6 @@ const HistoryView: React.FC<HistoryViewProps> = ({
         .reverse()
     : [];
 
-  // Function to get history data for a specific day from snapshots
   // Function to format display date based on day index
   const formatDisplayDate = (dateString: string, dayIndex: number): string => {
     if (dayIndex === 0) return "Today";
@@ -85,7 +84,7 @@ const HistoryView: React.FC<HistoryViewProps> = ({
 
   // Function to calculate completed habits count for a day
   const getCompletedCount = (habits: DailyHistory["habits"]): number => {
-    return habits.filter((h) => h.habbitDidCount >= h.habbitNeedCount).length;
+    return habits.filter((h) => h.habitDidCount >= h.habitNeedCount).length;
   };
 
   // Function to get total habits count for a day
@@ -141,24 +140,24 @@ const HistoryView: React.FC<HistoryViewProps> = ({
                 <>
                   {day.habits.map((habit) => (
                     <div
-                      key={habit.habbitId}
+                      key={habit.habitId}
                       className={`
                         flex justify-between items-center p-3 rounded-lg
                         ${
-                          habit.habbitDidCount >= habit.habbitNeedCount
+                          habit.habitDidCount >= habit.habitNeedCount
                             ? "bg-green-50"
                             : "bg-gray-50"
                         }
                       `}
                     >
                       <span className="text-sm text-gray-700">
-                        {habit.habbitText}
+                        {habit.habitText}
                       </span>
                       <div className="flex items-center gap-2">
                         <span className="text-sm text-gray-500">
-                          {habit.habbitDidCount}/{habit.habbitNeedCount}
+                          {habit.habitDidCount}/{habit.habitNeedCount}
                         </span>
-                        {habit.habbitDidCount >= habit.habbitNeedCount && (
+                        {habit.habitDidCount >= habit.habitNeedCount && (
                           <IoCheckmarkCircle className="w-5 h-5 text-green-600" />
                         )}
                       </div>

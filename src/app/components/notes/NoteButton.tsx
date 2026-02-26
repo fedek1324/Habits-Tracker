@@ -1,8 +1,8 @@
-import INote from "@/src/app/types/note";
+import INote from "@/src/lib/types/note";
 import { FormEventHandler, useEffect, useState } from "react";
 import { LuTrash } from "react-icons/lu";
 import { MdOutlineEdit } from "react-icons/md";
-import Modal from "./Modal";
+import Modal from "../Modal";
 
 function getPastelColorFromId(id: string): string {
   // Simple hash function
@@ -78,16 +78,16 @@ const NoteButton: React.FC<NoteButtonProps> = ({
   return (
     <div
       className={`
-        rounded-2xl 
-        p-4 
-        w-full 
-        flex 
-        items-center 
-        justify-between 
-        shadow-sm 
-        hover:shadow-md 
-        transition-all 
-      
+        rounded-2xl
+        p-4
+        w-full
+        flex
+        items-center
+        justify-between
+        shadow-sm
+        hover:shadow-md
+        transition-all
+
       `}
       style={{ backgroundColor: getPastelColorFromId(note.id) }}
     >

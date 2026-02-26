@@ -3,49 +3,51 @@
 import { useOptimistic, useTransition, useState, useMemo } from "react";
 import { useRouter } from "next/navigation";
 
-import HabitButton from "./components/HabbitButton";
-import AddHabbit from "./components/AddHabbit";
-import AddNote from "./components/AddNote";
-import NoteButton from "./components/NoteButton";
-import HistoryView from "./components/HistoryView";
-import BottomNavigation from "./components/BottomNavigation";
+import HabitButton from "./habits/HabitButton";
+import AddHabit from "./habits/AddHabit";
+import AddNote from "./notes/AddNote";
+import NoteButton from "./notes/NoteButton";
+import HistoryView from "./HistoryView";
+import BottomNavigation from "./BottomNavigation";
 
 import {
   incrementHabitAction,
   addHabitAction,
   deleteHabitAction,
   editHabitAction,
+} from "../actions/habits";
+import {
   addNoteAction,
   editNoteAction,
   deleteNoteAction,
-  logoutAction,
-} from "./actions";
+} from "../actions/notes";
+import { logoutAction } from "../actions/auth";
 
-import IHabbit from "./types/habbit";
-import INote from "./types/note";
-import IDailySnapshot from "./types/dailySnapshot";
+import IHabit from "@/src/lib/types/habit";
+import INote from "@/src/lib/types/note";
+import IDailySnapshot from "@/src/lib/types/dailySnapshot";
 
 // ─────────────────────────────────────────────────────────
 // Types
 // ─────────────────────────────────────────────────────────
 
 type ViewState = {
-  habits: IHabbit[];
+  habits: IHabit[];
   notes: INote[];
   todaySnapshot: IDailySnapshot;
 };
 
 type OptimisticAction =
   | { type: "increment"; habitId: string; newCount: number }
-  | { type: "addHabit"; habit: IHabbit; needCount: number }
+  | { type: "addHabit"; habit: IHabit; needCount: number }
   | { type: "deleteHabit"; habitId: string }
-  | { type: "editHabit"; habit: IHabbit; needCount: number; actualCount: number }
+  | { type: "editHabit"; habit: IHabit; needCount: number; actualCount: number }
   | { type: "addNote"; note: INote; text: string }
   | { type: "editNote"; noteId: string; newName: string; newText: string }
   | { type: "deleteNote"; noteId: string };
 
 type Props = {
-  habits: IHabbit[];
+  habits: IHabit[];
   notes: INote[];
   todaySnapshot: IDailySnapshot;
   allSnapshots: IDailySnapshot[];
@@ -64,9 +66,9 @@ function reduce(state: ViewState, action: OptimisticAction): ViewState {
         ...state,
         todaySnapshot: {
           ...state.todaySnapshot,
-          habbits: state.todaySnapshot.habbits.map((h) =>
-            h.habbitId === action.habitId
-              ? { ...h, habbitDidCount: action.newCount }
+          habits: state.todaySnapshot.habits.map((h) =>
+            h.habitId === action.habitId
+              ? { ...h, habitDidCount: action.newCount }
               : h
           ),
         },
@@ -77,9 +79,9 @@ function reduce(state: ViewState, action: OptimisticAction): ViewState {
         habits: [...state.habits, action.habit],
         todaySnapshot: {
           ...state.todaySnapshot,
-          habbits: [
-            ...state.todaySnapshot.habbits,
-            { habbitId: action.habit.id, habbitNeedCount: action.needCount, habbitDidCount: 0 },
+          habits: [
+            ...state.todaySnapshot.habits,
+            { habitId: action.habit.id, habitNeedCount: action.needCount, habitDidCount: 0 },
           ],
         },
       };
@@ -88,7 +90,7 @@ function reduce(state: ViewState, action: OptimisticAction): ViewState {
         ...state,
         todaySnapshot: {
           ...state.todaySnapshot,
-          habbits: state.todaySnapshot.habbits.filter((h) => h.habbitId !== action.habitId),
+          habits: state.todaySnapshot.habits.filter((h) => h.habitId !== action.habitId),
         },
       };
     case "editHabit":
@@ -97,9 +99,9 @@ function reduce(state: ViewState, action: OptimisticAction): ViewState {
         habits: state.habits.map((h) => (h.id === action.habit.id ? action.habit : h)),
         todaySnapshot: {
           ...state.todaySnapshot,
-          habbits: state.todaySnapshot.habbits.map((h) =>
-            h.habbitId === action.habit.id
-              ? { ...h, habbitNeedCount: action.needCount, habbitDidCount: action.actualCount }
+          habits: state.todaySnapshot.habits.map((h) =>
+            h.habitId === action.habit.id
+              ? { ...h, habitNeedCount: action.needCount, habitDidCount: action.actualCount }
               : h
           ),
         },
@@ -172,15 +174,15 @@ export default function HabitsView({
   // ── Habit handlers ───────────────────────────────────────
 
   function handleIncrement(habitId: string) {
-    const current = optimistic.todaySnapshot.habbits.find((h) => h.habbitId === habitId);
-    const newCount = (current?.habbitDidCount ?? 0) + 1;
+    const current = optimistic.todaySnapshot.habits.find((h) => h.habitId === habitId);
+    const newCount = (current?.habitDidCount ?? 0) + 1;
     startTransition(async () => {
       addOptimistic({ type: "increment", habitId, newCount });
       await incrementHabitAction(habitId, newCount);
     });
   }
 
-  function handleAddHabit(habit: IHabbit, needCount: number) {
+  function handleAddHabit(habit: IHabit, needCount: number) {
     startTransition(async () => {
       addOptimistic({ type: "addHabit", habit, needCount });
       await addHabitAction(habit, needCount);
@@ -194,7 +196,7 @@ export default function HabitsView({
     });
   }
 
-  function handleEditHabit(habit: IHabbit, needCount: number, actualCount: number) {
+  function handleEditHabit(habit: IHabit, needCount: number, actualCount: number) {
     startTransition(async () => {
       addOptimistic({ type: "editHabit", habit, needCount, actualCount });
       await editHabitAction(habit, needCount, actualCount);
@@ -226,11 +228,11 @@ export default function HabitsView({
 
   // ── Derived display lists ────────────────────────────────
 
-  const displayHabits = optimistic.todaySnapshot.habbits.map((h) => ({
-    habitId: h.habbitId,
-    text: optimistic.habits.find((hab) => hab.id === h.habbitId)?.text ?? "",
-    needCount: h.habbitNeedCount,
-    actualCount: h.habbitDidCount,
+  const displayHabits = optimistic.todaySnapshot.habits.map((h) => ({
+    habitId: h.habitId,
+    text: optimistic.habits.find((hab) => hab.id === h.habitId)?.text ?? "",
+    needCount: h.habitNeedCount,
+    actualCount: h.habitDidCount,
   }));
 
   const displayNotes = optimistic.todaySnapshot.notes.map((n) => ({
@@ -284,7 +286,7 @@ export default function HabitsView({
                   {displayHabits.map((h) => (
                     <HabitButton
                       key={h.habitId}
-                      habbit={{ id: h.habitId, text: h.text }}
+                      habit={{ id: h.habitId, text: h.text }}
                       currentCount={h.actualCount}
                       needCount={h.needCount}
                       onIncrement={handleIncrement}
@@ -304,7 +306,7 @@ export default function HabitsView({
                 </div>
               )}
 
-              <AddHabbit onAdd={handleAddHabit} />
+              <AddHabit onAdd={handleAddHabit} />
               <AddNote onAdd={handleAddNote} />
             </>
           ) : (

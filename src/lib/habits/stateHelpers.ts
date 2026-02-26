@@ -1,6 +1,6 @@
-import IDailySnapshot from "@/src/app/types/dailySnapshot";
-import IHabbit from "@/src/app/types/habbit";
-import INote from "@/src/app/types/note";
+import IDailySnapshot from "@/src/lib/types/dailySnapshot";
+import IHabit from "@/src/lib/types/habit";
+import INote from "@/src/lib/types/note";
 
 /** "YYYY-MM-DD" → Date at midnight local time */
 function parseDate(dateStr: string): Date {
@@ -30,10 +30,10 @@ function buildSnapshotFromPrevious(
 ): IDailySnapshot {
   return {
     date: dateStr,
-    habbits: prev.habbits.map((h) => ({
-      habbitId: h.habbitId,
-      habbitNeedCount: h.habbitNeedCount,
-      habbitDidCount: 0,
+    habits: prev.habits.map((h) => ({
+      habitId: h.habitId,
+      habitNeedCount: h.habitNeedCount,
+      habitDidCount: 0,
     })),
     notes: prev.notes.map((n) => ({ noteId: n.noteId, noteText: "" })),
   };
@@ -45,15 +45,15 @@ function buildSnapshotFromPrevious(
  */
 export function buildEmptySnapshot(
   dateStr: string,
-  habits: IHabbit[],
+  habits: IHabit[],
   notes: INote[]
 ): IDailySnapshot {
   return {
     date: dateStr,
-    habbits: habits.map((h) => ({
-      habbitId: h.id,
-      habbitNeedCount: 1,
-      habbitDidCount: 0,
+    habits: habits.map((h) => ({
+      habitId: h.id,
+      habitNeedCount: 1,
+      habitDidCount: 0,
     })),
     notes: notes.map((n) => ({ noteId: n.id, noteText: "" })),
   };
@@ -67,7 +67,7 @@ export function buildEmptySnapshot(
  * Does NOT write anything to Sheets — purely in-memory.
  */
 export function computeTodayAndFillHistory(
-  habits: IHabbit[],
+  habits: IHabit[],
   notes: INote[],
   rawSnapshots: IDailySnapshot[],
   todayStr: string

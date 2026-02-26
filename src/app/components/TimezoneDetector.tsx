@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect } from "react";
-import { setTimezoneAction } from "@/src/app/actions";
+import { setTimezoneAction } from "@/src/app/actions/auth";
 
 type Props = {
   /** Timezone currently stored in the cookie (may be "UTC" on first visit). */
