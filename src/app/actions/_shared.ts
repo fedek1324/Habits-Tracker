@@ -1,8 +1,11 @@
+"use server";
+
 import { cookies } from "next/headers";
 import { revalidatePath } from "next/cache";
 import { UserRefreshClient } from "google-auth-library";
 import {
   findSpreadsheetByName,
+  createSpreadsheet,
   readSpreadsheetData,
   parseSpreadsheetRows,
   writeSpreadsheetData,
@@ -17,7 +20,7 @@ import IDailySnapshot from "@/src/lib/types/dailySnapshot";
 // Cookie helpers
 // ─────────────────────────────────────────────────────────
 
-export const COOKIE_OPTS = {
+const COOKIE_OPTS = {
   httpOnly: true,
   secure: process.env.NODE_ENV === "production",
   sameSite: "lax" as const,
@@ -31,6 +34,86 @@ export async function setCookie(name: string, value: string) {
 
 export async function deleteCookie(name: string) {
   (await cookies()).delete(name);
+}
+
+// ─────────────────────────────────────────────────────────
+// Page data (used by page.tsx on every render)
+// ─────────────────────────────────────────────────────────
+
+export type PageData = {
+  spreadsheetUrl: string;
+  habits: IHabit[];
+  notes: INote[];
+  todaySnapshot: IDailySnapshot;
+  allSnapshots: IDailySnapshot[];
+  todayStr: string;
+};
+
+/**
+ * Fetches all data needed to render the page.
+ * Handles token refresh and spreadsheet lookup with cookie caching.
+ * Returns null if not authenticated or on any error.
+ */
+export async function getData(): Promise<PageData | null> {
+  const store = await cookies();
+  const refreshToken = store.get("google_refresh_token")?.value;
+  if (!refreshToken) return null;
+
+  try {
+    const tz = store.get("tz")?.value ?? "UTC";
+    const todayStr = new Intl.DateTimeFormat("en-CA", { timeZone: tz }).format(new Date());
+
+    // --- Access token: use cached or refresh ---
+    let accessToken = store.get("google_access_token")?.value;
+    const tokenExpiry = Number(store.get("google_token_expiry")?.value ?? "0");
+
+    if (!accessToken || tokenExpiry <= Date.now() + 60_000) {
+      const client = new UserRefreshClient(
+        process.env.GOOGLE_CLIENT_ID!,
+        process.env.GOOGLE_CLIENT_SECRET!,
+        refreshToken
+      );
+      const { credentials } = await client.refreshAccessToken();
+      if (!credentials.access_token) throw new Error("Token refresh failed");
+
+      accessToken = credentials.access_token;
+      const maxAge = credentials.expiry_date
+        ? Math.max(0, Math.floor((credentials.expiry_date - Date.now()) / 1000))
+        : 3600;
+      store.set("google_access_token", accessToken, { ...COOKIE_OPTS, maxAge });
+      store.set(
+        "google_token_expiry",
+        String(credentials.expiry_date ?? Date.now() + maxAge * 1000),
+        { ...COOKIE_OPTS, maxAge }
+      );
+    }
+
+    // --- Spreadsheet: use cached ID or find-or-create ---
+    let spreadsheetId = store.get("google_spreadsheet_id")?.value;
+    let spreadsheetUrl: string;
+
+    if (spreadsheetId) {
+      spreadsheetUrl = `https://docs.google.com/spreadsheets/d/${spreadsheetId}/edit`;
+    } else {
+      const spreadsheet =
+        (await findSpreadsheetByName(accessToken, SPREADSHEET_NAME)) ??
+        (await createSpreadsheet(accessToken, [], [], []));
+      spreadsheetId = spreadsheet.id;
+      spreadsheetUrl = spreadsheet.url;
+      store.set("google_spreadsheet_id", spreadsheetId, COOKIE_OPTS);
+    }
+
+    // --- Read and parse Sheets data ---
+    const { habits, notes, todaySnapshot, allSnapshots } = await readState({
+      accessToken,
+      spreadsheetId,
+      todayStr,
+    });
+
+    return { spreadsheetUrl, habits, notes, todaySnapshot, allSnapshots, todayStr };
+  } catch {
+    return null;
+  }
 }
 
 // ─────────────────────────────────────────────────────────
@@ -74,7 +157,7 @@ export async function getServerContext(): Promise<ServerContext> {
     });
   }
 
-  // --- Spreadsheet ID: use cached or lookup ---
+  // --- Spreadsheet ID: use cached or lookup (throw if not found) ---
   let spreadsheetId = store.get("google_spreadsheet_id")?.value;
 
   if (!spreadsheetId) {
