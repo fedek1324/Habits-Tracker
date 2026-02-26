@@ -1,5 +1,3 @@
-"use server";
-
 import { cookies } from "next/headers";
 import { revalidatePath } from "next/cache";
 import { UserRefreshClient } from "google-auth-library";
@@ -75,17 +73,9 @@ export async function getData(): Promise<PageData | null> {
       );
       const { credentials } = await client.refreshAccessToken();
       if (!credentials.access_token) throw new Error("Token refresh failed");
-
       accessToken = credentials.access_token;
-      const maxAge = credentials.expiry_date
-        ? Math.max(0, Math.floor((credentials.expiry_date - Date.now()) / 1000))
-        : 3600;
-      store.set("google_access_token", accessToken, { ...COOKIE_OPTS, maxAge });
-      store.set(
-        "google_token_expiry",
-        String(credentials.expiry_date ?? Date.now() + maxAge * 1000),
-        { ...COOKIE_OPTS, maxAge }
-      );
+      // Cannot cache here — called from a Server Component, cookies are read-only.
+      // Cache is written by getServerContext() on the first Server Action call.
     }
 
     // --- Spreadsheet: use cached ID or find-or-create ---
@@ -100,7 +90,7 @@ export async function getData(): Promise<PageData | null> {
         (await createSpreadsheet(accessToken, [], [], []));
       spreadsheetId = spreadsheet.id;
       spreadsheetUrl = spreadsheet.url;
-      store.set("google_spreadsheet_id", spreadsheetId, COOKIE_OPTS);
+      // Cannot cache here — called from a Server Component, cookies are read-only.
     }
 
     // --- Read and parse Sheets data ---
