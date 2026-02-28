@@ -14,13 +14,17 @@ export default function LoginView() {
     flow: "auth-code",
     scope: SCOPES,
     onSuccess: async (codeResponse) => {
-      const { data } = await axios.post("/api/auth/google", {
-        code: codeResponse.code,
-      });
-      const { userId } = data;
-      if (userId) {
-        await loginAction(userId);
-        router.refresh();
+      try {
+        const { data } = await axios.post("/api/auth/google", {
+          code: codeResponse.code,
+        });
+        const { userId } = data;
+        if (userId) {
+          await loginAction(userId);
+          router.refresh();
+        }
+      } catch (err) {
+        console.error("Login failed:", err);
       }
     },
     onError: (err) => console.error("Google login failed:", err),

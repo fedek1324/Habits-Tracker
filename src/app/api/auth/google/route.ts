@@ -21,14 +21,25 @@ export async function POST(request: NextRequest) {
     if (!code) return NextResponse.json({ error: 'Code is required' }, { status: 400 });
 
     const { tokens } = await oAuth2Client.getToken(code);
-    if (!tokens.id_token) {
-      return NextResponse.json({ error: 'No id_token received' }, { status: 500 });
+    if (!tokens.access_token) {
+      return NextResponse.json({ error: 'No access_token received' }, { status: 500 });
     }
 
-    const { sub } = decodeIdTokenPayload(tokens.id_token);
-    return NextResponse.json({ userId: sub });
+    // Prefer id_token (no extra HTTP call); fall back to userinfo endpoint
+    let userId: string;
+    if (tokens.id_token) {
+      userId = decodeIdTokenPayload(tokens.id_token).sub;
+    } else {
+      const res = await fetch('https://www.googleapis.com/oauth2/v3/userinfo', {
+        headers: { Authorization: `Bearer ${tokens.access_token}` },
+      });
+      const info = await res.json() as { sub: string };
+      userId = info.sub;
+    }
+
+    return NextResponse.json({ userId });
   } catch (error) {
-    console.error('Error exchanging code for tokens:', error);
+    console.error('Error during authentication:', error);
     return NextResponse.json({ error: 'Authentication failed' }, { status: 500 });
   }
 }
