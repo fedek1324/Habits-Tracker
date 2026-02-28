@@ -1,18 +1,11 @@
 import { cookies } from "next/headers";
 import { revalidatePath } from "next/cache";
-import { UserRefreshClient } from "google-auth-library";
-import {
-  findSpreadsheetByName,
-  createSpreadsheet,
-  readSpreadsheetData,
-  parseSpreadsheetRows,
-  writeSpreadsheetData,
-  SPREADSHEET_NAME,
-} from "@/src/lib/googleSheets/googleSheetsApi";
+import { getUserData, setUserData } from "@/src/lib/redis/userDataStore";
 import { computeTodayAndFillHistory } from "@/src/lib/habits/stateHelpers";
 import IHabit from "@/src/lib/types/habit";
 import INote from "@/src/lib/types/note";
 import IDailySnapshot from "@/src/lib/types/dailySnapshot";
+import IHabitsAndNotesData from "@/src/lib/types/habitsData";
 
 // ─────────────────────────────────────────────────────────
 // Cookie helpers
@@ -39,7 +32,6 @@ export async function deleteCookie(name: string) {
 // ─────────────────────────────────────────────────────────
 
 export type PageData = {
-  spreadsheetUrl: string;
   habits: IHabit[];
   notes: INote[];
   todaySnapshot: IDailySnapshot;
@@ -47,60 +39,20 @@ export type PageData = {
   todayStr: string;
 };
 
-/**
- * Fetches all data needed to render the page.
- * Handles token refresh and spreadsheet lookup with cookie caching.
- * Returns null if not authenticated or on any error.
- */
 export async function getData(): Promise<PageData | null> {
   const store = await cookies();
-  const refreshToken = store.get("google_refresh_token")?.value;
-  if (!refreshToken) return null;
+  const userId = store.get("user_id")?.value;
+  if (!userId) return null;
 
   try {
     const tz = store.get("tz")?.value ?? "UTC";
     const todayStr = new Intl.DateTimeFormat("en-CA", { timeZone: tz }).format(new Date());
 
-    // --- Access token: use cached or refresh ---
-    let accessToken = store.get("google_access_token")?.value;
-    const tokenExpiry = Number(store.get("google_token_expiry")?.value ?? "0");
+    const raw = await getUserData(userId);
+    const { habits, notes, snapshots } = raw ?? { habits: [], notes: [], snapshots: [] };
+    const { todaySnapshot, allSnapshots } = computeTodayAndFillHistory(habits, notes, snapshots, todayStr);
 
-    if (!accessToken || tokenExpiry <= Date.now() + 60_000) {
-      const client = new UserRefreshClient(
-        process.env.GOOGLE_CLIENT_ID!,
-        process.env.GOOGLE_CLIENT_SECRET!,
-        refreshToken
-      );
-      const { credentials } = await client.refreshAccessToken();
-      if (!credentials.access_token) throw new Error("Token refresh failed");
-      accessToken = credentials.access_token;
-      // Cannot cache here — called from a Server Component, cookies are read-only.
-      // Cache is written by getServerContext() on the first Server Action call.
-    }
-
-    // --- Spreadsheet: use cached ID or find-or-create ---
-    let spreadsheetId = store.get("google_spreadsheet_id")?.value;
-    let spreadsheetUrl: string;
-
-    if (spreadsheetId) {
-      spreadsheetUrl = `https://docs.google.com/spreadsheets/d/${spreadsheetId}/edit`;
-    } else {
-      const spreadsheet =
-        (await findSpreadsheetByName(accessToken, SPREADSHEET_NAME)) ??
-        (await createSpreadsheet(accessToken, [], [], []));
-      spreadsheetId = spreadsheet.id;
-      spreadsheetUrl = spreadsheet.url;
-      // Cannot cache here — called from a Server Component, cookies are read-only.
-    }
-
-    // --- Read and parse Sheets data ---
-    const { habits, notes, todaySnapshot, allSnapshots } = await readState({
-      accessToken,
-      spreadsheetId,
-      todayStr,
-    });
-
-    return { spreadsheetUrl, habits, notes, todaySnapshot, allSnapshots, todayStr };
+    return { habits, notes, todaySnapshot, allSnapshots, todayStr };
   } catch {
     return null;
   }
@@ -111,62 +63,24 @@ export async function getData(): Promise<PageData | null> {
 // ─────────────────────────────────────────────────────────
 
 export type ServerContext = {
-  accessToken: string;
-  spreadsheetId: string;
+  userId: string;
   todayStr: string;
 };
 
 export async function getServerContext(): Promise<ServerContext> {
   const store = await cookies();
-  const refreshToken = store.get("google_refresh_token")?.value;
+  const userId = store.get("user_id")?.value;
+  if (!userId) throw new Error("Not authenticated");
+
   const tz = store.get("tz")?.value ?? "UTC";
-
-  if (!refreshToken) throw new Error("Not authenticated");
-
-  // --- Access token: use cached or refresh ---
-  let accessToken = store.get("google_access_token")?.value;
-  const tokenExpiry = Number(store.get("google_token_expiry")?.value ?? "0");
-
-  if (!accessToken || tokenExpiry <= Date.now() + 60_000) {
-    const client = new UserRefreshClient(
-      process.env.GOOGLE_CLIENT_ID!,
-      process.env.GOOGLE_CLIENT_SECRET!,
-      refreshToken
-    );
-    const { credentials } = await client.refreshAccessToken();
-    if (!credentials.access_token) throw new Error("Token refresh failed");
-
-    accessToken = credentials.access_token;
-    const maxAge = credentials.expiry_date
-      ? Math.max(0, Math.floor((credentials.expiry_date - Date.now()) / 1000))
-      : 3600;
-    store.set("google_access_token", accessToken, { ...COOKIE_OPTS, maxAge });
-    store.set("google_token_expiry", String(credentials.expiry_date ?? Date.now() + maxAge * 1000), {
-      ...COOKIE_OPTS,
-      maxAge,
-    });
-  }
-
-  // --- Spreadsheet ID: use cached or lookup (throw if not found) ---
-  let spreadsheetId = store.get("google_spreadsheet_id")?.value;
-
-  if (!spreadsheetId) {
-    const spreadsheet = await findSpreadsheetByName(accessToken, SPREADSHEET_NAME);
-    if (!spreadsheet) throw new Error("Spreadsheet not found");
-    spreadsheetId = spreadsheet.id;
-    store.set("google_spreadsheet_id", spreadsheetId, COOKIE_OPTS);
-  }
-
   const todayStr = new Intl.DateTimeFormat("en-CA", { timeZone: tz }).format(new Date());
-  return { accessToken, spreadsheetId, todayStr };
+
+  return { userId, todayStr };
 }
 
-/** Read + parse current Sheets data, compute today's snapshot, return full mutable state. */
 export async function readState(ctx: ServerContext) {
-  const rows = await readSpreadsheetData(ctx.accessToken, ctx.spreadsheetId);
-  const { habits, notes, snapshots } = rows
-    ? parseSpreadsheetRows(rows)
-    : { habits: [], notes: [], snapshots: [] };
+  const raw = await getUserData(ctx.userId);
+  const { habits, notes, snapshots } = raw ?? { habits: [], notes: [], snapshots: [] };
   const { todaySnapshot, allSnapshots } = computeTodayAndFillHistory(
     habits,
     notes,
@@ -176,13 +90,13 @@ export async function readState(ctx: ServerContext) {
   return { habits, notes, todaySnapshot, allSnapshots };
 }
 
-/** Write full state back to Sheets and trigger page revalidation. */
 export async function commitState(
   ctx: ServerContext,
   habits: IHabit[],
   notes: INote[],
   snapshots: IDailySnapshot[]
 ) {
-  await writeSpreadsheetData(ctx.accessToken, ctx.spreadsheetId, habits, notes, snapshots);
+  const data: IHabitsAndNotesData = { habits, notes, snapshots };
+  await setUserData(ctx.userId, data);
   revalidatePath("/");
 }

@@ -3,20 +3,14 @@
 import { revalidatePath } from "next/cache";
 import { setCookie, deleteCookie } from "./_shared";
 
-/**
- * Called after Google OAuth. Only stores the refresh token — no Google API calls here.
- * page.tsx handles finding/creating the spreadsheet on next render.
- */
-export async function loginAction(refreshToken: string): Promise<void> {
-  await setCookie("google_refresh_token", refreshToken);
+export async function loginAction(userId: string): Promise<void> {
+  await setCookie("user_id", userId);
   revalidatePath("/");
 }
 
 export async function logoutAction(): Promise<void> {
-  await deleteCookie("google_refresh_token");
-  await deleteCookie("google_access_token");
-  await deleteCookie("google_token_expiry");
-  await deleteCookie("google_spreadsheet_id");
+  await deleteCookie("user_id");
+  await deleteCookie("tz");
   revalidatePath("/");
 }
 

@@ -1,6 +1,5 @@
 "use client";
 
-import { v4 as uuidv4 } from "uuid";
 import { FormEventHandler, useState } from "react";
 import Modal from "../Modal";
 import INote from "@/src/lib/types/note";
@@ -31,7 +30,7 @@ const AddNote: React.FC<{ onAdd: (note: INote, text: string) => void }> = ({
     }
 
     const newNote = {
-      id: uuidv4(),
+      id: crypto.randomUUID(),
       name: newNoteName,
     };
 

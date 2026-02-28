@@ -7,25 +7,28 @@ const oAuth2Client = new OAuth2Client(
   'postmessage'
 );
 
+function decodeIdTokenPayload(idToken: string): { sub: string } {
+  const parts = idToken.split('.');
+  if (parts.length !== 3) throw new Error('Invalid id_token format');
+  const payload = parts[1].replace(/-/g, '+').replace(/_/g, '/');
+  const json = Buffer.from(payload, 'base64').toString('utf-8');
+  return JSON.parse(json);
+}
+
 export async function POST(request: NextRequest) {
   try {
-    const body = await request.json();
-    const { code } = body;
+    const { code } = await request.json();
+    if (!code) return NextResponse.json({ error: 'Code is required' }, { status: 400 });
 
-    if (!code) {
-      return NextResponse.json({ error: 'Code is required' }, { status: 400 });
+    const { tokens } = await oAuth2Client.getToken(code);
+    if (!tokens.id_token) {
+      return NextResponse.json({ error: 'No id_token received' }, { status: 500 });
     }
 
-    // Exchange code for tokens
-    const { tokens } = await oAuth2Client.getToken(code);
-    console.log('Received tokens:', tokens);
-
-    return NextResponse.json(tokens);
+    const { sub } = decodeIdTokenPayload(tokens.id_token);
+    return NextResponse.json({ userId: sub });
   } catch (error) {
     console.error('Error exchanging code for tokens:', error);
-    return NextResponse.json(
-      { error: 'Failed to exchange code for tokens' },
-      { status: 500 }
-    );
+    return NextResponse.json({ error: 'Authentication failed' }, { status: 500 });
   }
 }

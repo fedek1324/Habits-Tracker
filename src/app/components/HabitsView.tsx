@@ -51,7 +51,6 @@ type Props = {
   notes: INote[];
   todaySnapshot: IDailySnapshot;
   allSnapshots: IDailySnapshot[];
-  spreadsheetUrl: string;
   todayStr: string; // "YYYY-MM-DD"
 };
 
@@ -148,7 +147,6 @@ export default function HabitsView({
   notes,
   todaySnapshot,
   allSnapshots,
-  spreadsheetUrl,
   todayStr,
 }: Props) {
   const [activeTab, setActiveTab] = useState<"today" | "history">("today");
@@ -261,17 +259,7 @@ export default function HabitsView({
               <div className="mb-4 flex items-center justify-between bg-green-50 border border-green-200 rounded-2xl px-5 py-3">
                 <div className="flex items-center gap-2 text-sm text-green-700">
                   <div className="w-2 h-2 bg-green-500 rounded-full" />
-                  Connected to Google Sheets
-                  {spreadsheetUrl && (
-                    <a
-                      href={spreadsheetUrl}
-                      target="_blank"
-                      rel="noreferrer"
-                      className="ml-2 underline text-green-600"
-                    >
-                      Open
-                    </a>
-                  )}
+                  Synced
                 </div>
                 <button
                   onClick={() => startTransition(async () => { await logoutAction(); router.refresh(); })}

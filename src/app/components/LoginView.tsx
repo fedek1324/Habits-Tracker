@@ -5,8 +5,7 @@ import { useRouter } from "next/navigation";
 import axios from "axios";
 import { loginAction } from "@/src/app/actions/auth";
 
-const SCOPES =
-  "https://www.googleapis.com/auth/spreadsheets https://www.googleapis.com/auth/drive.file";
+const SCOPES = "openid profile";
 
 export default function LoginView() {
   const router = useRouter();
@@ -18,9 +17,9 @@ export default function LoginView() {
       const { data } = await axios.post("/api/auth/google", {
         code: codeResponse.code,
       });
-      const { refresh_token } = data;
-      if (refresh_token) {
-        await loginAction(refresh_token);
+      const { userId } = data;
+      if (userId) {
+        await loginAction(userId);
         router.refresh();
       }
     },

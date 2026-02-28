@@ -1,6 +1,5 @@
 "use client";
 
-import { v4 as uuidv4 } from "uuid";
 import { FormEventHandler, useState } from "react";
 import Modal from "../Modal";
 import IHabit from "@/src/lib/types/habit";
@@ -39,7 +38,7 @@ const AddHabit: React.FC<{ onAdd: (habit: IHabit, needCount: number) => void }> 
     }
 
     const newHabit = {
-      id: uuidv4(),
+      id: crypto.randomUUID(),
       text: newHabitText.trim(),
     };
 
