@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import axios from "axios";
 import { loginAction } from "@/src/app/actions/auth";
 
-const SCOPES = "openid profile";
+const SCOPES = "openid";
 
 export default function LoginView() {
   const router = useRouter();
