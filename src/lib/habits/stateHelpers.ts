@@ -72,31 +72,30 @@ export function computeTodayAndFillHistory(
   rawSnapshots: IDailySnapshot[],
   todayStr: string
 ): { todaySnapshot: IDailySnapshot; allSnapshots: IDailySnapshot[] } {
-  const byDate = new Map<string, IDailySnapshot>(
-    rawSnapshots.map((s) => [s.date, s])
+  // Deduplicate: if Redis has stale duplicate dates (from a prior bug), keep the last occurrence
+  const snapshots = Array.from(
+    new Map(rawSnapshots.map((s) => [s.date, s])).values()
   );
+
+  const byDate = new Map<string, IDailySnapshot>(snapshots.map((s) => [s.date, s]));
 
   // Already have today's snapshot — just fill any gaps before it
   if (byDate.has(todayStr)) {
-    const filled = fillGaps(rawSnapshots, todayStr);
+    const filled = fillGaps(snapshots, todayStr);
     return { todaySnapshot: byDate.get(todayStr)!, allSnapshots: filled };
   }
 
   // No snapshots at all
-  if (rawSnapshots.length === 0) {
+  if (snapshots.length === 0) {
     const todaySnapshot = buildEmptySnapshot(todayStr, habits, notes);
     return { todaySnapshot, allSnapshots: [todaySnapshot] };
   }
 
-  // Fill gaps from the last snapshot up to and including today
-  const sorted = [...rawSnapshots].sort((a, b) => a.date.localeCompare(b.date));
-  const lastSnapshot = sorted[sorted.length - 1];
+  // Fill gaps from the last snapshot up to and including today.
+  // fillGaps already creates today as the last entry — use it directly.
+  const sorted = [...snapshots].sort((a, b) => a.date.localeCompare(b.date));
   const filled = fillGaps(sorted, todayStr);
-
-  // Create today's snapshot from the last known one
-  const todaySnapshot = buildSnapshotFromPrevious(todayStr, lastSnapshot);
-  filled.push(todaySnapshot);
-  byDate.set(todayStr, todaySnapshot);
+  const todaySnapshot = filled[filled.length - 1];
 
   return { todaySnapshot, allSnapshots: filled };
 }
