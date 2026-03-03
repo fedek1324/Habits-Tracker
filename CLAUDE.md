@@ -2,32 +2,6 @@
 
 This file provides guidance to Claude Code when working with this repository.
 
-## `computeTodayAndFillHistory` algorithm (`src/lib/habits/stateHelpers.ts`)
-
-Takes `rawSnapshots` from Redis + `todayStr` + `habits` + `notes`. Returns `{ todaySnapshot, allSnapshots }`.
-
-1. **Deduplicate** — build `Map<date, snapshot>` over `rawSnapshots` (last occurrence wins); use `Array.from(map.values())` as the working set. This cleans up any stale duplicates stored by a prior bug.
-2. **Today already exists** → `fillGaps(snapshots, todayStr)` (fills holes between existing dates), return `byDate.get(todayStr)` as `todaySnapshot`.
-3. **No snapshots at all** → `buildEmptySnapshot(todayStr, habits, notes)`.
-4. **Today missing** → sort snapshots, call `fillGaps(sorted, todayStr)`. `fillGaps` iterates from `(lastDate + 1)` up to and **including** `todayStr`, calling `buildSnapshotFromPrevious` for each gap day. Today is therefore the **last element** of the returned array — grab it directly (`filled[filled.length - 1]`). Do **not** push a second today snapshot.
-
-Critical invariant: `allSnapshots` must never contain two entries with the same date. If it does, every `.map(s => s.date === todayStr ? updated : s)` in the action files replaces both, writing duplicates back to Redis.
-
-## Deletion vs. empty text invariant
-
-The column for a habit/note always stays in storage (needed for history display).
-Distinction is made by the **value**:
-
-- `"actual/needed"` (habit) / any text (note) — item recorded that day
-- `"0/needed"` (habit) / `"No text for that day"` (note) — item exists, nothing recorded (sentinel)
-- `""` / absent — item was deleted from this day's snapshot
-
-Rules:
-
-- **write**: item present in snapshot → always write cell (use sentinel for empty note text). Item absent → cell stays empty/absent.
-- **parse**: empty/absent → item excluded from snapshot. Sentinel → item included with empty `noteText`.
-- **`computeTodayAndFillHistory`**: copies items from last snapshot with reset values → become sentinel on next write → item survives into future days.
-
 ## Product
 
 A personal habit tracker for tracking daily habits — how many times per day a habit was done vs. the target. Works on any device (desktop, mobile, tablet) via the browser. Users connect their Google account once, and all data syncs automatically to a personal Google Spreadsheet so habits are accessible from any device at any time.
@@ -101,6 +75,32 @@ All cookies: `httpOnly`, `secure` in production, `sameSite: lax`, 30-day expiry.
 
 - `google_refresh_token` — OAuth refresh token, set by `loginAction`
 - `tz` — IANA timezone string (e.g. `"Europe/Moscow"`), set by `TimezoneDetector`
+
+## `computeTodayAndFillHistory` algorithm (`src/lib/habits/stateHelpers.ts`)
+
+Takes `rawSnapshots` from Redis + `todayStr` + `habits` + `notes`. Returns `{ todaySnapshot, allSnapshots }`.
+
+1. **Deduplicate** — build `Map<date, snapshot>` over `rawSnapshots` (last occurrence wins); use `Array.from(map.values())` as the working set. This cleans up any stale duplicates stored by a prior bug.
+2. **Today already exists** → `fillGaps(snapshots, todayStr)` (fills holes between existing dates), return `byDate.get(todayStr)` as `todaySnapshot`.
+3. **No snapshots at all** → `buildEmptySnapshot(todayStr, habits, notes)`.
+4. **Today missing** → sort snapshots, call `fillGaps(sorted, todayStr)`. `fillGaps` iterates from `(lastDate + 1)` up to and **including** `todayStr`, calling `buildSnapshotFromPrevious` for each gap day. Today is therefore the **last element** of the returned array — grab it directly (`filled[filled.length - 1]`). Do **not** push a second today snapshot.
+
+Critical invariant: `allSnapshots` must never contain two entries with the same date. If it does, every `.map(s => s.date === todayStr ? updated : s)` in the action files replaces both, writing duplicates back to Redis.
+
+## Deletion vs. empty text invariant
+
+The column for a habit/note always stays in storage (needed for history display).
+Distinction is made by the **value**:
+
+- `"actual/needed"` (habit) / any text (note) — item recorded that day
+- `"0/needed"` (habit) / `"No text for that day"` (note) — item exists, nothing recorded (sentinel)
+- `""` / absent — item was deleted from this day's snapshot
+
+Rules:
+
+- **write**: item present in snapshot → always write cell (use sentinel for empty note text). Item absent → cell stays empty/absent.
+- **parse**: empty/absent → item excluded from snapshot. Sentinel → item included with empty `noteText`.
+- **`computeTodayAndFillHistory`**: copies items from last snapshot with reset values → become sentinel on next write → item survives into future days.
 
 ## Directory Structure
 
