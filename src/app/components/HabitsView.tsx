@@ -15,11 +15,13 @@ import {
   addHabitAction,
   deleteHabitAction,
   editHabitAction,
+  editHistoryHabitAction,
 } from "../actions/habits";
 import {
   addNoteAction,
   editNoteAction,
   deleteNoteAction,
+  editHistoryNoteAction,
 } from "../actions/notes";
 import { logoutAction } from "../actions/auth";
 
@@ -35,6 +37,7 @@ type ViewState = {
   habits: IHabit[];
   notes: INote[];
   todaySnapshot: IDailySnapshot;
+  allSnapshots: IDailySnapshot[];
 };
 
 type OptimisticAction =
@@ -44,7 +47,9 @@ type OptimisticAction =
   | { type: "editHabit"; habit: IHabit; needCount: number; actualCount: number }
   | { type: "addNote"; note: INote; text: string }
   | { type: "editNote"; noteId: string; newName: string; newText: string }
-  | { type: "deleteNote"; noteId: string };
+  | { type: "deleteNote"; noteId: string }
+  | { type: "editHistoryHabit"; dateStr: string; habitId: string; newCount: number }
+  | { type: "editHistoryNote"; dateStr: string; noteId: string; newText: string };
 
 type Props = {
   habits: IHabit[];
@@ -135,6 +140,34 @@ function reduce(state: ViewState, action: OptimisticAction): ViewState {
           notes: state.todaySnapshot.notes.filter((n) => n.noteId !== action.noteId),
         },
       };
+    case "editHistoryHabit":
+      return {
+        ...state,
+        allSnapshots: state.allSnapshots.map((s) =>
+          s.date === action.dateStr
+            ? {
+                ...s,
+                habits: s.habits.map((h) =>
+                  h.habitId === action.habitId ? { ...h, habitDidCount: action.newCount } : h
+                ),
+              }
+            : s
+        ),
+      };
+    case "editHistoryNote":
+      return {
+        ...state,
+        allSnapshots: state.allSnapshots.map((s) =>
+          s.date === action.dateStr
+            ? {
+                ...s,
+                notes: s.notes.map((n) =>
+                  n.noteId === action.noteId ? { ...n, noteText: action.newText } : n
+                ),
+              }
+            : s
+        ),
+      };
   }
 }
 
@@ -154,7 +187,7 @@ export default function HabitsView({
   const router = useRouter();
 
   const [optimistic, addOptimistic] = useOptimistic<ViewState, OptimisticAction>(
-    { habits, notes, todaySnapshot },
+    { habits, notes, todaySnapshot, allSnapshots },
     reduce
   );
 
@@ -221,6 +254,22 @@ export default function HabitsView({
     startTransition(async () => {
       addOptimistic({ type: "deleteNote", noteId });
       await deleteNoteAction(noteId);
+    });
+  }
+
+  // ── History handlers ─────────────────────────────────────
+
+  function handleEditHistoryHabit(dateStr: string, habitId: string, newCount: number) {
+    startTransition(async () => {
+      addOptimistic({ type: "editHistoryHabit", dateStr, habitId, newCount });
+      await editHistoryHabitAction(dateStr, habitId, newCount);
+    });
+  }
+
+  function handleEditHistoryNote(dateStr: string, noteId: string, newText: string) {
+    startTransition(async () => {
+      addOptimistic({ type: "editHistoryNote", dateStr, noteId, newText });
+      await editHistoryNoteAction(dateStr, noteId, newText);
     });
   }
 
@@ -301,8 +350,10 @@ export default function HabitsView({
             <HistoryView
               habits={optimistic.habits}
               notes={optimistic.notes}
-              snapshots={allSnapshots}
+              snapshots={optimistic.allSnapshots}
               today={todayDate}
+              onEditHabit={handleEditHistoryHabit}
+              onEditNote={handleEditHistoryNote}
             />
           )}
         </main>

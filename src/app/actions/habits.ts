@@ -84,3 +84,25 @@ export async function editHabitAction(
 
   await commitState(ctx, updatedHabits, notes, updatedSnapshots);
 }
+
+export async function editHistoryHabitAction(
+  dateStr: string,
+  habitId: string,
+  newCount: number
+): Promise<void> {
+  const ctx = await getServerContext();
+  const { habits, notes, allSnapshots } = await readState(ctx);
+
+  const updatedSnapshots = allSnapshots.map((s) =>
+    s.date === dateStr
+      ? {
+          ...s,
+          habits: s.habits.map((h) =>
+            h.habitId === habitId ? { ...h, habitDidCount: newCount } : h
+          ),
+        }
+      : s
+  );
+
+  await commitState(ctx, habits, notes, updatedSnapshots);
+}

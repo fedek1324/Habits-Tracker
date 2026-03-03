@@ -44,6 +44,30 @@ export async function editNoteAction(
   await commitState(ctx, habits, updatedNotes, updatedSnapshots);
 }
 
+export async function editHistoryNoteAction(
+  dateStr: string,
+  noteId: string,
+  newText: string
+): Promise<void> {
+  const ctx = await getServerContext();
+  const { habits, notes, allSnapshots } = await readState(ctx);
+
+  const updatedSnapshots = allSnapshots.map((s) =>
+    s.date === dateStr
+      ? {
+          ...s,
+          notes: s.notes.map((n) =>
+            n.noteId === noteId
+              ? { ...n, noteText: newText || "No text for that day" }
+              : n
+          ),
+        }
+      : s
+  );
+
+  await commitState(ctx, habits, notes, updatedSnapshots);
+}
+
 export async function deleteNoteAction(noteId: string): Promise<void> {
   const ctx = await getServerContext();
   const { habits, notes, todaySnapshot, allSnapshots } = await readState(ctx);
