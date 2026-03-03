@@ -202,14 +202,12 @@ const HistoryView: React.FC<HistoryViewProps> = ({
                       </div>
                     </div>
                   ))}
-                  {day.notes
-                    .filter(
-                      (note) =>
-                        note.noteText &&
-                        note.noteText.trim() !== "" &&
-                        note.noteText !== "No text for that day"
-                    )
-                    .map((note) => (
+                  {day.notes.map((note) => {
+                    const hasText =
+                      note.noteText &&
+                      note.noteText.trim() !== "" &&
+                      note.noteText !== "No text for that day";
+                    return (
                       <div
                         key={note.noteId}
                         className="p-3 rounded-lg bg-blue-50 border-l-4 border-blue-200"
@@ -219,7 +217,11 @@ const HistoryView: React.FC<HistoryViewProps> = ({
                             <span className="text-sm font-medium text-gray-700">
                               {note.noteName}
                             </span>
-                            <span className="text-sm text-gray-600">{note.noteText}</span>
+                            {hasText ? (
+                              <span className="text-sm text-gray-600">{note.noteText}</span>
+                            ) : (
+                              <span className="text-sm italic text-gray-400">No text</span>
+                            )}
                           </div>
                           <button
                             onClick={() =>
@@ -238,7 +240,8 @@ const HistoryView: React.FC<HistoryViewProps> = ({
                           </button>
                         </div>
                       </div>
-                    ))}
+                    );
+                  })}
                 </>
               ) : (
                 <div className="p-3 rounded-lg bg-gray-50 text-center">
