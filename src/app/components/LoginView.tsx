@@ -33,7 +33,7 @@ export default function LoginView() {
   });
 
   return (
-    <div className="min-h-screen bg-gray-100 flex items-center justify-center">
+    <div className="min-h-screen bg-gray-100 flex items-center justify-center animate-fadeIn">
       <div className="bg-white rounded-2xl shadow-sm p-8 max-w-sm w-full mx-4 text-center">
         <h1 className="text-2xl font-semibold text-gray-800 mb-2">Habit Tracker</h1>
         <p className="text-gray-500 text-sm mb-8">

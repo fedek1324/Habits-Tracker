@@ -299,7 +299,7 @@ export default function HabitsView({
   // ── Render ───────────────────────────────────────────────
 
   return (
-    <div className="min-h-screen bg-gray-100">
+    <div className="min-h-screen bg-gray-100 animate-fadeIn">
       <div className="max-w-2xl mx-auto bg-white min-h-screen shadow-sm">
         <main className="p-4 pb-20">
           {activeTab === "today" ? (
