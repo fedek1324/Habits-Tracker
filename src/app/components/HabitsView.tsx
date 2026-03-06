@@ -275,18 +275,24 @@ export default function HabitsView({
 
   // ── Derived display lists ────────────────────────────────
 
-  const displayHabits = optimistic.todaySnapshot.habits.map((h) => ({
-    habitId: h.habitId,
-    text: optimistic.habits.find((hab) => hab.id === h.habitId)?.text ?? "",
-    needCount: h.habitNeedCount,
-    actualCount: h.habitDidCount,
-  }));
+  const displayHabits = useMemo(() => {
+    const habitMap = new Map(optimistic.habits.map((h) => [h.id, h.text]));
+    return optimistic.todaySnapshot.habits.map((h) => ({
+      habitId: h.habitId,
+      text: habitMap.get(h.habitId) ?? "",
+      needCount: h.habitNeedCount,
+      actualCount: h.habitDidCount,
+    }));
+  }, [optimistic.habits, optimistic.todaySnapshot.habits]);
 
-  const displayNotes = optimistic.todaySnapshot.notes.map((n) => ({
-    noteId: n.noteId,
-    noteName: optimistic.notes.find((note) => note.id === n.noteId)?.name ?? "",
-    noteText: n.noteText,
-  }));
+  const displayNotes = useMemo(() => {
+    const noteMap = new Map(optimistic.notes.map((n) => [n.id, n.name]));
+    return optimistic.todaySnapshot.notes.map((n) => ({
+      noteId: n.noteId,
+      noteName: noteMap.get(n.noteId) ?? "",
+      noteText: n.noteText,
+    }));
+  }, [optimistic.notes, optimistic.todaySnapshot.notes]);
 
   const hasContent = displayHabits.length > 0 || displayNotes.length > 0;
 

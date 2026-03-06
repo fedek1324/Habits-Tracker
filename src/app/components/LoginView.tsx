@@ -2,7 +2,6 @@
 
 import { useGoogleLogin } from "@react-oauth/google";
 import { useRouter } from "next/navigation";
-import axios from "axios";
 import { loginAction } from "@/src/app/actions/auth";
 
 const SCOPES = "openid";
@@ -15,10 +14,13 @@ export default function LoginView() {
     scope: SCOPES,
     onSuccess: async (codeResponse) => {
       try {
-        const { data } = await axios.post("/api/auth/google", {
-          code: codeResponse.code,
+        const res = await fetch("/api/auth/google", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ code: codeResponse.code }),
         });
-        const { userId } = data;
+        if (!res.ok) throw new Error("Auth request failed");
+        const { userId } = await res.json();
         if (userId) {
           await loginAction(userId);
           router.refresh();

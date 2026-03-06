@@ -1,6 +1,6 @@
 "use client";
 
-import { FormEventHandler, useEffect, useState } from "react";
+import { FormEventHandler, useEffect, useMemo, useState } from "react";
 import IHabit from "@/src/lib/types/habit";
 import INote from "@/src/lib/types/note";
 import IDailySnapshot from "@/src/lib/types/dailySnapshot";
@@ -75,36 +75,34 @@ const HistoryView: React.FC<HistoryViewProps> = ({
     }
   }, [editModal]);
 
-  // Transform snapshots to history format
-  const history: DailyHistory[] = snapshots
-    ? snapshots
-        .filter((snapshot) => {
-          const today00 = getDate00(today);
-          const snapshotDate = getDate00(snapshot.date);
-          return snapshotDate <= today00;
-        })
-        .map((snapshot) => ({
-          date: snapshot.date,
-          habits: snapshot.habits.map((habitSnapshot) => {
-            const habit = habits.find((h) => h.id === habitSnapshot.habitId);
-            return {
-              habitId: habitSnapshot.habitId,
-              habitText: habit?.text || "Unknown Habit",
-              habitNeedCount: habitSnapshot.habitNeedCount,
-              habitDidCount: habitSnapshot.habitDidCount,
-            };
-          }),
-          notes: (snapshot.notes || []).map((noteSnapshot) => {
-            const note = notes.find((n) => n.id === noteSnapshot.noteId);
-            return {
-              noteId: noteSnapshot.noteId,
-              noteName: note?.name || "Unknown Note",
-              noteText: noteSnapshot.noteText,
-            };
-          }),
-        }))
-        .reverse()
-    : [];
+  const PAGE_SIZE = 7;
+  const [visibleCount, setVisibleCount] = useState(PAGE_SIZE);
+
+  const history: DailyHistory[] = useMemo(() => {
+    if (!snapshots) return [];
+    const habitMap = new Map(habits.map((h) => [h.id, h.text]));
+    const noteMap = new Map(notes.map((n) => [n.id, n.name]));
+    const today00 = getDate00(today);
+    return snapshots
+      .filter((s) => getDate00(s.date) <= today00)
+      .map((s) => ({
+        date: s.date,
+        habits: s.habits.map((h) => ({
+          habitId: h.habitId,
+          habitText: habitMap.get(h.habitId) || "Unknown Habit",
+          habitNeedCount: h.habitNeedCount,
+          habitDidCount: h.habitDidCount,
+        })),
+        notes: (s.notes || []).map((n) => ({
+          noteId: n.noteId,
+          noteName: noteMap.get(n.noteId) || "Unknown Note",
+          noteText: n.noteText,
+        })),
+      }))
+      .reverse();
+  }, [snapshots, habits, notes, today]);
+
+  const visibleHistory = history.slice(0, visibleCount);
 
   const formatDisplayDate = (dateString: string, dayIndex: number): string => {
     if (dayIndex === 0) return "Today";
@@ -148,12 +146,12 @@ const HistoryView: React.FC<HistoryViewProps> = ({
       <h1 className="text-2xl font-semibold text-gray-800 mb-6">History</h1>
 
       <div className="space-y-6">
-        {history.map((day) => (
+        {visibleHistory.map((day, dayIndex) => (
           <div key={day.date} className="border-b border-gray-100 pb-4">
             {/* Day Header */}
             <div className="flex justify-between items-center mb-3">
               <h3 className="font-medium text-gray-900">
-                {formatDisplayDate(day.date, history.indexOf(day))}
+                {formatDisplayDate(day.date, dayIndex)}
               </h3>
               {getTotalCount(day.habits) !== 0 && (
                 <span className="text-sm text-gray-500">
@@ -251,6 +249,15 @@ const HistoryView: React.FC<HistoryViewProps> = ({
             </div>
           </div>
         ))}
+
+        {visibleCount < history.length && (
+          <button
+            onClick={() => setVisibleCount((c) => c + PAGE_SIZE)}
+            className="w-full py-3 text-sm text-blue-600 hover:text-blue-800 font-medium transition-colors"
+          >
+            Show more ({history.length - visibleCount} days remaining)
+          </button>
+        )}
       </div>
 
       {/* Edit modal */}
