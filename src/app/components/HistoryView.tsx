@@ -1,6 +1,6 @@
 "use client";
 
-import { FormEventHandler, useEffect, useMemo, useState } from "react";
+import { FormEventHandler, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import IHabit from "@/src/lib/types/habit";
 import INote from "@/src/lib/types/note";
 import IDailySnapshot from "@/src/lib/types/dailySnapshot";
@@ -103,6 +103,23 @@ const HistoryView: React.FC<HistoryViewProps> = ({
   }, [snapshots, habits, notes, today]);
 
   const visibleHistory = history.slice(0, visibleCount);
+  const hasMore = visibleCount < history.length;
+
+  const sentinelRef = useRef<HTMLDivElement>(null);
+  const loadMore = useCallback(() => {
+    setVisibleCount((c) => c + PAGE_SIZE);
+  }, []);
+
+  useEffect(() => {
+    const el = sentinelRef.current;
+    if (!el || !hasMore) return;
+    const observer = new IntersectionObserver(
+      ([entry]) => { if (entry.isIntersecting) loadMore(); },
+      { rootMargin: "200px" }
+    );
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, [hasMore, loadMore]);
 
   const formatDisplayDate = (dateString: string, dayIndex: number): string => {
     if (dayIndex === 0) return "Today";
@@ -250,14 +267,7 @@ const HistoryView: React.FC<HistoryViewProps> = ({
           </div>
         ))}
 
-        {visibleCount < history.length && (
-          <button
-            onClick={() => setVisibleCount((c) => c + PAGE_SIZE)}
-            className="w-full py-3 text-sm text-blue-600 hover:text-blue-800 font-medium transition-colors"
-          >
-            Show more ({history.length - visibleCount} days remaining)
-          </button>
-        )}
+        {hasMore && <div ref={sentinelRef} className="h-1" />}
       </div>
 
       {/* Edit modal */}
