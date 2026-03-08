@@ -1,6 +1,6 @@
 "use client";
 
-import { useOptimistic, useTransition, useState, useMemo } from "react";
+import { useOptimistic, useTransition, useState, useMemo, useEffect } from "react";
 import { useRouter } from "next/navigation";
 
 import HabitButton from "./habits/HabitButton";
@@ -190,6 +190,15 @@ export default function HabitsView({
     { habits, notes, todaySnapshot, allSnapshots },
     reduce
   );
+
+  // Re-fetch server data when the user returns to this tab (cross-device sync)
+  useEffect(() => {
+    const onVisibilityChange = () => {
+      if (document.visibilityState === "visible") router.refresh();
+    };
+    document.addEventListener("visibilitychange", onVisibilityChange);
+    return () => document.removeEventListener("visibilitychange", onVisibilityChange);
+  }, [router]);
 
   // "today" as a Date object for HistoryView
   const todayDate = useMemo(() => {
