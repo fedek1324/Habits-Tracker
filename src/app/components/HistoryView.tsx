@@ -125,10 +125,10 @@ const HistoryView: React.FC<HistoryViewProps> = ({
     const date = getDate00(dateString);
     const weekday = date.toLocaleDateString("en-US", { weekday: "short" });
     const gray = <span className="text-gray-400 font-normal">{weekday}</span>;
-    if (dayIndex === 0) return <>Today, {gray}</>;
-    if (dayIndex === 1) return <>Yesterday, {gray}</>;
+    if (dayIndex === 0) return <>Today {gray}</>;
+    if (dayIndex === 1) return <>Yesterday {gray}</>;
     const monthDay = date.toLocaleDateString("en-US", { month: "short", day: "numeric" });
-    return <>{monthDay}, {gray}</>;
+    return <>{monthDay} {gray}</>;
   };
 
   const getCompletedCount = (habits: DailyHistory["habits"]): number =>
