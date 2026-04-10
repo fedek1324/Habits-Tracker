@@ -121,13 +121,13 @@ const HistoryView: React.FC<HistoryViewProps> = ({
     return () => observer.disconnect();
   }, [hasMore, loadMore]);
 
-  const formatDisplayDate = (dateString: string, dayIndex: number): string => {
+  const formatDisplayDate = (dateString: string, dayIndex: number): React.ReactNode => {
     if (dayIndex === 0) return "Today";
     if (dayIndex === 1) return "Yesterday";
     const date = getDate00(dateString);
     const weekday = date.toLocaleDateString("en-US", { weekday: "short" });
     const monthDay = date.toLocaleDateString("en-US", { month: "short", day: "numeric" });
-    return `${monthDay}, ${weekday}`;
+    return <>{monthDay}, <span className="text-gray-400 font-normal">{weekday}</span></>;
   };
 
   const getCompletedCount = (habits: DailyHistory["habits"]): number =>
