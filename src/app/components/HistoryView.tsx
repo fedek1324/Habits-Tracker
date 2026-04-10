@@ -125,7 +125,9 @@ const HistoryView: React.FC<HistoryViewProps> = ({
     if (dayIndex === 0) return "Today";
     if (dayIndex === 1) return "Yesterday";
     const date = getDate00(dateString);
-    return date.toLocaleDateString("en-US", { month: "short", day: "numeric" });
+    const weekday = date.toLocaleDateString("en-US", { weekday: "short" });
+    const monthDay = date.toLocaleDateString("en-US", { month: "short", day: "numeric" });
+    return `${weekday}, ${monthDay}`;
   };
 
   const getCompletedCount = (habits: DailyHistory["habits"]): number =>
